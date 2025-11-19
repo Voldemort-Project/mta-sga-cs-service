@@ -30,5 +30,10 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
+    @property
+    def sync_database_url(self) -> str:
+        """Get synchronous database URL for Alembic migrations"""
+        return self.database_url.replace("+asyncpg", "")
+
 
 settings = Settings()
