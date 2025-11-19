@@ -32,7 +32,34 @@ alembic/            # Database migrations
 tests/              # Test files
 ```
 
-## Setup
+## 🐳 Quick Start with Docker (Recommended for Production)
+
+The fastest way to get started:
+
+```bash
+# 1. Create .env file with your database URL
+echo "DATABASE_URL=postgresql+asyncpg://user:pass@host/db" > .env
+
+# 2. Build and run with Docker Compose
+docker-compose up -d
+
+# 3. View logs
+docker-compose logs -f
+```
+
+Or using Makefile:
+
+```bash
+make build    # Build Docker image
+make run      # Run container
+make logs     # View logs
+```
+
+📖 **Full Docker documentation**: See [docs/DOCKER.md](docs/DOCKER.md) for comprehensive Docker deployment guide.
+
+---
+
+## Setup (Local Development)
 
 ### 1. Install uv (if not already installed)
 
@@ -184,6 +211,7 @@ alembic upgrade head
 
 ## ✨ Features
 
+### Application Features
 -   ✅ FastAPI dengan async/await
 -   ✅ Pydantic v2 untuk validation
 -   ✅ SQLAlchemy 2.0 async dengan Neon PostgreSQL
@@ -195,6 +223,15 @@ alembic upgrade head
 -   ✅ OpenAPI documentation
 -   ✅ Graceful shutdown dengan connection cleanup
 -   ✅ Modular dan scalable
+
+### Docker & Deployment Features
+-   ✅ Production-ready Dockerfile dengan multi-stage build
+-   ✅ Automatic database migrations pada startup
+-   ✅ Health checks dan monitoring
+-   ✅ Non-root user untuk security
+-   ✅ Optimized image size
+-   ✅ Docker Compose untuk easy deployment
+-   ✅ Makefile untuk command shortcuts
 
 ## 🗄️ Neon Database Features
 

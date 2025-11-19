@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  # Main application service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sga-cs-service
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Application settings
+      - APP_NAME=sga-cs-service
+      - APP_VERSION=0.1.0
+      - ENV=production
+      - DEBUG=false
+
+      # Server settings
+      - HOST=0.0.0.0
+      - PORT=8000
+
+      # Database settings (replace with your actual database URL)
+      # For Neon or external database
+      - DATABASE_URL=${DATABASE_URL}
+
+      # Optional: Database pool settings
+      - DB_POOL_SIZE=5
+      - DB_MAX_OVERFLOW=10
+      - DB_POOL_TIMEOUT=30
+      - DB_POOL_RECYCLE=3600
+      - DB_ECHO=false
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+# Optional: Add PostgreSQL service for local development
+# Uncomment if you want to run database locally instead of using Neon
+#   postgres:
+#     image: postgres:15-alpine
+#     container_name: sga-cs-db
+#     restart: unless-stopped
+#     environment:
+#       - POSTGRES_USER=cs_user
+#       - POSTGRES_PASSWORD=cs_password
+#       - POSTGRES_DB=cs_service
+#     ports:
+#       - "5432:5432"
+#     volumes:
+#       - postgres_data:/var/lib/postgresql/data
+#     healthcheck:
+#       test: ["CMD-SHELL", "pg_isready -U cs_user"]
+#       interval: 10s
+#       timeout: 5s
+#       retries: 5
+
+# volumes:
+#   postgres_data:
