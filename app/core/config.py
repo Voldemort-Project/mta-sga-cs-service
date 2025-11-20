@@ -1,4 +1,5 @@
 """Application configuration using Pydantic Settings"""
+from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,6 +30,42 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore"
     )
+
+    def model_post_init(self, __context) -> None:
+        """Clean database URL of asyncpg-incompatible parameters"""
+        # Remove psycopg2-specific parameters that asyncpg doesn't support
+        self.database_url = self._clean_asyncpg_url(self.database_url)
+
+    @staticmethod
+    def _clean_asyncpg_url(url: str) -> str:
+        """Remove query parameters not supported by asyncpg"""
+        if "+asyncpg" not in url:
+            return url
+
+        parsed = urlparse(url)
+        if not parsed.query:
+            return url
+
+        # Parse query parameters
+        params = parse_qs(parsed.query)
+
+        # Remove asyncpg-incompatible parameters
+        unsupported = ["sslmode", "channel_binding"]
+        for param in unsupported:
+            params.pop(param, None)
+
+        # Rebuild query string
+        new_query = urlencode(params, doseq=True) if params else ""
+
+        # Rebuild URL
+        return urlunparse((
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            parsed.params,
+            new_query,
+            parsed.fragment
+        ))
 
     @property
     def sync_database_url(self) -> str:

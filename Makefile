@@ -176,8 +176,36 @@ dev-setup: ## Setup development environment
 		echo "$(YELLOW)Creating .env file...$(NC)"; \
 		echo "DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/cs_service" > .env; \
 	fi
+	uv sync
 	@echo "$(GREEN)✓ Development environment ready!$(NC)"
 	@echo "$(YELLOW)Don't forget to update .env with your actual database URL$(NC)"
+
+dev-install: ## Install dependencies locally with uv
+	@echo "$(CYAN)Installing dependencies...$(NC)"
+	uv sync
+	@echo "$(GREEN)✓ Dependencies installed!$(NC)"
+
+dev-run: ## Run server locally with auto-reload (port 8080)
+	@echo "$(CYAN)Starting development server on http://localhost:8080$(NC)"
+	uv run uvicorn app.main:app --reload --port 8080
+
+dev-run-8000: ## Run server locally on port 8000
+	@echo "$(CYAN)Starting development server on http://localhost:8000$(NC)"
+	uv run uvicorn app.main:app --reload --port 8000
+
+dev-migrate: ## Run migrations locally
+	@echo "$(CYAN)Running database migrations...$(NC)"
+	uv run alembic upgrade head
+	@echo "$(GREEN)✓ Migrations completed!$(NC)"
+
+dev-migrate-rollback: ## Rollback last migration locally
+	@echo "$(CYAN)Rolling back last migration...$(NC)"
+	uv run alembic downgrade -1
+	@echo "$(GREEN)✓ Rollback completed!$(NC)"
+
+dev-migrate-status: ## Check migration status locally
+	@echo "$(CYAN)Checking migration status...$(NC)"
+	uv run alembic current
 
 rebuild: clean build run ## Clean, build, and run container
 

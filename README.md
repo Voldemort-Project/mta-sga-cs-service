@@ -59,28 +59,44 @@ make logs     # View logs
 
 ---
 
-## Setup (Local Development)
+## 🚀 Local Development (Quick Start)
 
-### 1. Install uv (if not already installed)
+### Option 1: Using Makefile (Recommended)
+
+```bash
+# 1. Setup development environment (creates .env + installs deps)
+make dev-setup
+
+# 2. Update .env with your database credentials
+# Edit DATABASE_URL in .env file
+
+# 3. Run database migrations
+make dev-migrate
+
+# 4. Start development server (port 8080)
+make dev-run
+```
+
+### Option 2: Manual Setup
+
+#### 1. Install uv (if not already installed)
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-### 2. Create virtual environment and install dependencies
+#### 2. Install dependencies
 
 ```bash
-uv venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv pip install -e .
+uv sync
 ```
 
-### 3. Setup Neon Database
+#### 3. Setup Neon Database
 
 1. Create a Neon project at [neon.tech](https://neon.tech)
 2. Copy your connection string (use the **pooled** connection string for production)
 
-### 4. Configure environment variables
+#### 4. Configure environment variables
 
 Create `.env` file:
 
@@ -111,17 +127,33 @@ EOF
 
 **Note**: Replace `[user]`, `[password]`, `[neon-host]`, and `[database]` with your actual Neon credentials.
 
-### 5. Run the application
+#### 5. Run database migrations
 
 ```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uv run alembic upgrade head
 ```
 
-Or using the settings from .env:
+#### 6. Run the application
 
 ```bash
-python -m uvicorn app.main:app --reload
+# Port 8080 (recommended)
+uv run uvicorn app.main:app --reload --port 8080
+
+# Or port 8000
+uv run uvicorn app.main:app --reload --port 8000
 ```
+
+📖 **Full local development guide**: See [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md)
+
+### Quick Make Commands
+
+| Command | Description |
+|---------|-------------|
+| `make dev-setup` | Setup environment + install deps |
+| `make dev-run` | Run server on port 8080 |
+| `make dev-migrate` | Apply database migrations |
+| `make test-local` | Run tests |
+| `make help` | Show all available commands |
 
 ## API Documentation
 
@@ -149,40 +181,84 @@ Response:
 }
 ```
 
+### Guest Registration
+
+```
+POST /api/v1/guests/register
+```
+
+Register a new guest and automatically check them into a room.
+
+Request Body:
+```json
+{
+	"full_name": "John Doe",
+	"room_number": "101",
+	"checkin_date": "2024-01-15",
+	"email": "john@example.com",
+	"phone_number": "+6281234567890"
+}
+```
+
+📖 **Full API documentation**: See [docs/GUEST_REGISTRATION.md](docs/GUEST_REGISTRATION.md)
+
+## 📚 Documentation
+
+Comprehensive guides are available in the `docs/` directory:
+
+| Document | Description |
+|----------|-------------|
+| [LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) | Complete local development setup guide |
+| [GUEST_REGISTRATION.md](docs/GUEST_REGISTRATION.md) | Guest registration API documentation |
+| [DOCKER.md](docs/DOCKER.md) | Docker deployment guide |
+| [WEBHOOK_WAHA.md](docs/WEBHOOK_WAHA.md) | WhatsApp webhook integration |
+
 ## Development
 
 ### Install development dependencies
 
 ```bash
-uv pip install -e ".[dev]"
+uv sync
 ```
 
 ### Run tests
 
 ```bash
-pytest
+make test-local
+# or
+uv run pytest
 ```
 
 ### Database Migrations with Neon
 
-Create `.alembic.ini` if not exists:
-
-```bash
-alembic init alembic
-```
-
-Update `alembic/env.py` to use async engine and your DATABASE_URL from .env
-
 Create migration:
 
 ```bash
-alembic revision --autogenerate -m "Initial migration"
+uv run alembic revision --autogenerate -m "description"
 ```
 
 Apply migrations to Neon:
 
 ```bash
-alembic upgrade head
+make dev-migrate
+# or
+uv run alembic upgrade head
+```
+
+Check migration status:
+
+```bash
+make dev-migrate-status
+# or
+uv run alembic current
+```
+
+Rollback last migration:
+
+```bash
+make dev-migrate-rollback
+# or
+uv run alembic downgrade -1
 ```
 
 **Neon Tips**:

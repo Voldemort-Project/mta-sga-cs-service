@@ -19,6 +19,7 @@ class User(Base):
     division_id = Column(UUID(as_uuid=True), ForeignKey("divisions.id", ondelete="SET NULL"), nullable=True)  # guest tidak punya divisi
     role_id = Column(UUID(as_uuid=True), ForeignKey("roles.id", ondelete="RESTRICT"), nullable=False)
     name = Column(String, nullable=False)
+    email = Column(String)  # email address, optional for staff, required for guests
     phone = Column(String)
     id_card_number = Column(String)  # hanya diisi guest atau bisa null
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

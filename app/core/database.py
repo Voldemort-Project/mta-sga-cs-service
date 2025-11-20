@@ -17,7 +17,7 @@ async_engine = create_async_engine(
     pool_recycle=settings.db_pool_recycle,
     pool_pre_ping=True,  # Verify connections before using them
     connect_args={
-        "ssl": "require",  # Neon requires SSL
+        "ssl": True,  # Neon requires SSL (asyncpg uses boolean)
         "server_settings": {
             "application_name": settings.app_name,
         },
