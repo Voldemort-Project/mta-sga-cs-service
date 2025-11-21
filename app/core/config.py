@@ -24,6 +24,17 @@ class Settings(BaseSettings):
     db_pool_recycle: int = 3600  # 1 hour - recommended for Neon
     db_echo: bool = False
 
+    # Keycloak
+    keycloak_server_url: str = "http://localhost:8080"
+    keycloak_realm: str = "master"
+    keycloak_client_id: str = "sga-cs-service"
+    keycloak_client_secret: str = ""
+    keycloak_verify_ssl: bool = True
+
+    # JWT Settings
+    jwt_algorithm: str = "RS256"
+    jwt_audience: str | None = None  # Optional, will use client_id if not set
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
