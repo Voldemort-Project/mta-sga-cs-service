@@ -13,19 +13,21 @@ Endpoint untuk registrasi guest dengan auto check-in telah berhasil dibuat dan s
 **Endpoint**: `POST /api/v1/guests/register`
 
 **Request Body**:
-- ✅ Full Name (required)
-- ✅ Room Number (required)
-- ✅ Check-in Date (date only, required)
-- ✅ Email (validated email format, required)
-- ✅ Phone Number (required)
+
+-   ✅ Full Name (required)
+-   ✅ Room Number (required)
+-   ✅ Check-in Date (date only, required)
+-   ✅ Email (validated email format, required)
+-   ✅ Phone Number (required)
 
 **Fitur**:
-- ✅ Atomic transaction (all-or-nothing)
-- ✅ Auto check-in creation
-- ✅ Room status update to "occupied"
-- ✅ Email validation
-- ✅ Comprehensive error handling
-- ✅ Rollback on errors
+
+-   ✅ Atomic transaction (all-or-nothing)
+-   ✅ Auto check-in creation
+-   ✅ Room status update to "occupied"
+-   ✅ Email validation
+-   ✅ Comprehensive error handling
+-   ✅ Rollback on errors
 
 ---
 
@@ -34,15 +36,18 @@ Endpoint untuk registrasi guest dengan auto check-in telah berhasil dibuat dan s
 ### Bug 1: Missing `email-validator` Dependency ❌ → ✅
 
 **Problem**:
+
 ```
 ImportError: email-validator is not installed
 ```
 
 **Root Cause**:
-- Menggunakan `EmailStr` dari Pydantic di schema
-- Package `email-validator` tidak ada di dependencies
+
+-   Menggunakan `EmailStr` dari Pydantic di schema
+-   Package `email-validator` tidak ada di dependencies
 
 **Solution**:
+
 ```toml
 # pyproject.toml
 dependencies = [
@@ -53,6 +58,7 @@ dependencies = [
 ```
 
 **Verification**:
+
 ```bash
 ✅ uv sync  # Successfully installed
 ✅ Server runs without errors
@@ -63,22 +69,27 @@ dependencies = [
 ### Bug 2: Missing Email Field in User Model ❌ → ✅
 
 **Problem**:
-- User model tidak punya field `email`
-- Schema membutuhkan email untuk guest registration
+
+-   User model tidak punya field `email`
+-   Schema membutuhkan email untuk guest registration
 
 **Solution**:
+
 1. **Updated Model** (`app/models/user.py`):
+
 ```python
 email = Column(String)  # ✅ Added
 ```
 
 2. **Created Migration**:
+
 ```bash
 ✅ alembic revision --autogenerate -m "add_email_to_users"
 ✅ Migration file: f8e96862b7ab_add_email_to_users.py
 ```
 
 3. **Migration Content**:
+
 ```python
 def upgrade() -> None:
     op.add_column('users', sa.Column('email', sa.String(), nullable=True))
@@ -92,9 +103,10 @@ def downgrade() -> None:
 ### Bug 3: Inconvenient Development Workflow ❌ → ✅
 
 **Problem**:
-- Harus mengetik command panjang setiap kali
-- Tidak ada shortcut untuk development tasks
-- Mudah lupa command yang benar
+
+-   Harus mengetik command panjang setiap kali
+-   Tidak ada shortcut untuk development tasks
+-   Mudah lupa command yang benar
 
 **Solution**:
 **Enhanced Makefile** dengan development commands:
@@ -111,6 +123,7 @@ test-local:           # Run tests locally
 ```
 
 **Usage**:
+
 ```bash
 ✅ make dev-setup    # One command setup
 ✅ make dev-run      # Easy server start
@@ -123,38 +136,38 @@ test-local:           # Run tests locally
 
 ### 1. Core Implementation Files
 
-| File | Purpose |
-|------|---------|
-| `app/schemas/guest.py` | Request/Response schemas with validation |
-| `app/repositories/guest_repository.py` | Database operations |
-| `app/services/guest_service.py` | Business logic with transactions |
-| `app/api/v1/guest_router.py` | API endpoint |
+| File                                   | Purpose                                  |
+| -------------------------------------- | ---------------------------------------- |
+| `app/schemas/guest.py`                 | Request/Response schemas with validation |
+| `app/repositories/guest_repository.py` | Database operations                      |
+| `app/services/guest_service.py`        | Business logic with transactions         |
+| `app/api/v1/guest_router.py`           | API endpoint                             |
 
 ### 2. Database Migration
 
-| File | Purpose |
-|------|---------|
+| File                                                  | Purpose                         |
+| ----------------------------------------------------- | ------------------------------- |
 | `alembic/versions/f8e96862b7ab_add_email_to_users.py` | Add email column to users table |
 
 ### 3. Documentation Files
 
-| File | Purpose |
-|------|---------|
-| `docs/GUEST_REGISTRATION.md` | Complete API documentation |
-| `docs/GUEST_REGISTRATION_SUMMARY.md` | Implementation summary |
-| `docs/GUEST_REGISTRATION_QUICKREF.md` | Quick reference card |
-| `docs/LOCAL_DEVELOPMENT.md` | Local development guide |
-| `docs/IMPLEMENTATION_SUMMARY.md` | This file |
+| File                                  | Purpose                    |
+| ------------------------------------- | -------------------------- |
+| `docs/GUEST_REGISTRATION.md`          | Complete API documentation |
+| `docs/GUEST_REGISTRATION_SUMMARY.md`  | Implementation summary     |
+| `docs/GUEST_REGISTRATION_QUICKREF.md` | Quick reference card       |
+| `docs/LOCAL_DEVELOPMENT.md`           | Local development guide    |
+| `docs/IMPLEMENTATION_SUMMARY.md`      | This file                  |
 
 ### 4. Updated Files
 
-| File | Changes |
-|------|---------|
-| `app/models/user.py` | Added `email` field |
-| `app/api/router.py` | Registered guest router |
-| `pyproject.toml` | Added `email-validator` dependency |
-| `Makefile` | Added development commands |
-| `README.md` | Updated with guest API and dev commands |
+| File                 | Changes                                 |
+| -------------------- | --------------------------------------- |
+| `app/models/user.py` | Added `email` field                     |
+| `app/api/router.py`  | Registered guest router                 |
+| `pyproject.toml`     | Added `email-validator` dependency      |
+| `Makefile`           | Added development commands              |
+| `README.md`          | Updated with guest API and dev commands |
 
 ---
 
@@ -163,6 +176,7 @@ test-local:           # Run tests locally
 ### ✅ Atomic Operations Guaranteed
 
 **Database Configuration** (`app/core/database.py`):
+
 ```python
 AsyncSessionLocal = async_sessionmaker(
     async_engine,
@@ -172,6 +186,7 @@ AsyncSessionLocal = async_sessionmaker(
 ```
 
 **Service Layer** (`app/services/guest_service.py`):
+
 ```python
 try:
     # 1. Create user (flush, not commit)
@@ -192,10 +207,11 @@ except Exception:
 ```
 
 **Result**:
-- ✅ All operations succeed together
-- ✅ Or all operations fail together
-- ✅ No partial state
-- ✅ Data consistency guaranteed
+
+-   ✅ All operations succeed together
+-   ✅ Or all operations fail together
+-   ✅ No partial state
+-   ✅ Data consistency guaranteed
 
 ---
 
@@ -220,6 +236,7 @@ make dev-run
 ### Test the Endpoint
 
 **Using curl**:
+
 ```bash
 curl -X POST http://localhost:8080/api/v1/guests/register \
   -H "Content-Type: application/json" \
@@ -233,6 +250,7 @@ curl -X POST http://localhost:8080/api/v1/guests/register \
 ```
 
 **Using Browser**:
+
 1. Go to `http://localhost:8080/docs`
 2. Find "Guests" section
 3. Click "POST /api/v1/guests/register"
@@ -323,14 +341,14 @@ $ make dev-migrate-status  # Check status
 
 ## 📈 Improvements Summary
 
-| Aspect | Before | After | Impact |
-|--------|--------|-------|--------|
-| **Dependencies** | ❌ Missing | ✅ Complete | Can run server |
-| **Database** | ❌ No email field | ✅ Email added | Can store email |
-| **Development** | ❌ Long commands | ✅ Make shortcuts | Faster workflow |
-| **Documentation** | ❌ Minimal | ✅ Comprehensive | Easy to use |
-| **Transactions** | ✅ Already good | ✅ Maintained | Data consistency |
-| **Error Handling** | ✅ Already good | ✅ Enhanced | Better messages |
+| Aspect             | Before            | After             | Impact           |
+| ------------------ | ----------------- | ----------------- | ---------------- |
+| **Dependencies**   | ❌ Missing        | ✅ Complete       | Can run server   |
+| **Database**       | ❌ No email field | ✅ Email added    | Can store email  |
+| **Development**    | ❌ Long commands  | ✅ Make shortcuts | Faster workflow  |
+| **Documentation**  | ❌ Minimal        | ✅ Comprehensive  | Easy to use      |
+| **Transactions**   | ✅ Already good   | ✅ Maintained     | Data consistency |
+| **Error Handling** | ✅ Already good   | ✅ Enhanced       | Better messages  |
 
 ---
 
@@ -365,48 +383,52 @@ $ make dev-migrate-status  # Check status
 ## 🔜 Next Steps (Optional Enhancements)
 
 ### Feature Enhancements
-- [ ] Add authentication/authorization
-- [ ] Send confirmation email to guest
-- [ ] Add check-out endpoint
-- [ ] Add guest search/list endpoint
-- [ ] Add duplicate guest detection
-- [ ] Add room assignment optimization
+
+-   [ ] Add authentication/authorization
+-   [ ] Send confirmation email to guest
+-   [ ] Add check-out endpoint
+-   [ ] Add guest search/list endpoint
+-   [ ] Add duplicate guest detection
+-   [ ] Add room assignment optimization
 
 ### Technical Improvements
-- [ ] Add integration tests
-- [ ] Add API rate limiting
-- [ ] Add request logging/audit trail
-- [ ] Add monitoring/metrics
-- [ ] Add API versioning strategy
+
+-   [ ] Add integration tests
+-   [ ] Add API rate limiting
+-   [ ] Add request logging/audit trail
+-   [ ] Add monitoring/metrics
+-   [ ] Add API versioning strategy
 
 ### Documentation
-- [ ] Add API examples in multiple languages
-- [ ] Add sequence diagrams
-- [ ] Add troubleshooting guide
-- [ ] Add performance tuning guide
+
+-   [ ] Add API examples in multiple languages
+-   [ ] Add sequence diagrams
+-   [ ] Add troubleshooting guide
+-   [ ] Add performance tuning guide
 
 ---
 
 ## ✅ Final Checklist
 
-- ✅ Guest registration endpoint created
-- ✅ All required fields implemented
-- ✅ Email validation working
-- ✅ Atomic transactions implemented
-- ✅ Error handling comprehensive
-- ✅ Dependencies fixed
-- ✅ Database migration created
-- ✅ Makefile commands added
-- ✅ Documentation completed
-- ✅ Server runs without errors
-- ✅ Ready for testing
-- ✅ Ready for production deployment
+-   ✅ Guest registration endpoint created
+-   ✅ All required fields implemented
+-   ✅ Email validation working
+-   ✅ Atomic transactions implemented
+-   ✅ Error handling comprehensive
+-   ✅ Dependencies fixed
+-   ✅ Database migration created
+-   ✅ Makefile commands added
+-   ✅ Documentation completed
+-   ✅ Server runs without errors
+-   ✅ Ready for testing
+-   ✅ Ready for production deployment
 
 ---
 
 ## 🎉 Conclusion
 
 Semua requirements sudah diimplementasi dengan baik:
+
 1. ✅ Endpoint register guest sesuai spesifikasi
 2. ✅ Auto check-in termasuk dalam proses
 3. ✅ Semua field request sesuai (1-5)

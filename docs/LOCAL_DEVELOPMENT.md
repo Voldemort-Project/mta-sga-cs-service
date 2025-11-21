@@ -9,8 +9,9 @@ make dev-setup
 ```
 
 This will:
-- Create `.env` file if it doesn't exist
-- Install all dependencies using `uv`
+
+-   Create `.env` file if it doesn't exist
+-   Install all dependencies using `uv`
 
 ### 2. Configure Database
 
@@ -40,25 +41,27 @@ Server will start with auto-reload enabled! 🔥
 
 ## 📋 Available Make Commands for Local Development
 
-| Command | Description |
-|---------|-------------|
-| `make dev-setup` | Setup development environment (create .env + install deps) |
-| `make dev-install` | Install/update dependencies with uv |
-| `make dev-run` | Run server on port 8080 with auto-reload |
-| `make dev-run-8000` | Run server on port 8000 with auto-reload |
-| `make dev-migrate` | Run database migrations |
-| `make dev-migrate-rollback` | Rollback last migration |
-| `make dev-migrate-status` | Check current migration status |
-| `make test-local` | Run tests locally |
+| Command                     | Description                                                |
+| --------------------------- | ---------------------------------------------------------- |
+| `make dev-setup`            | Setup development environment (create .env + install deps) |
+| `make dev-install`          | Install/update dependencies with uv                        |
+| `make dev-run`              | Run server on port 8080 with auto-reload                   |
+| `make dev-run-8000`         | Run server on port 8000 with auto-reload                   |
+| `make dev-migrate`          | Run database migrations                                    |
+| `make dev-migrate-rollback` | Rollback last migration                                    |
+| `make dev-migrate-status`   | Check current migration status                             |
+| `make test-local`           | Run tests locally                                          |
 
 ## 🔧 Manual Commands (Without Make)
 
 ### Install Dependencies
+
 ```bash
 uv sync
 ```
 
 ### Run Server
+
 ```bash
 # Port 8080
 uv run uvicorn app.main:app --reload --port 8080
@@ -68,6 +71,7 @@ uv run uvicorn app.main:app --reload --port 8000
 ```
 
 ### Run Migrations
+
 ```bash
 # Apply migrations
 uv run alembic upgrade head
@@ -80,6 +84,7 @@ uv run alembic downgrade -1
 ```
 
 ### Run Tests
+
 ```bash
 uv run pytest
 ```
@@ -109,16 +114,17 @@ dependencies = [
 
 Once the server is running:
 
-- **API**: `http://localhost:8080` or `http://localhost:8000`
-- **Interactive Docs (Swagger)**: `http://localhost:8080/docs`
-- **ReDoc**: `http://localhost:8080/redoc`
-- **OpenAPI JSON**: `http://localhost:8080/openapi.json`
+-   **API**: `http://localhost:8080` or `http://localhost:8000`
+-   **Interactive Docs (Swagger)**: `http://localhost:8080/docs`
+-   **ReDoc**: `http://localhost:8080/redoc`
+-   **OpenAPI JSON**: `http://localhost:8080/openapi.json`
 
 ## 🐛 Troubleshooting
 
 ### Error: `ModuleNotFoundError: No module named 'pydantic_settings'`
 
 **Solution**: Install dependencies first
+
 ```bash
 make dev-install
 # or
@@ -128,6 +134,7 @@ uv sync
 ### Error: `ImportError: email-validator is not installed`
 
 **Solution**: Already fixed in `pyproject.toml`. Just run:
+
 ```bash
 make dev-install
 # or
@@ -137,8 +144,10 @@ uv sync
 ### Error: `Address already in use`
 
 **Solution**: Port is being used. Either:
+
 1. Stop the other process using the port
 2. Use different port:
+
 ```bash
 uv run uvicorn app.main:app --reload --port 8081
 ```
@@ -146,6 +155,7 @@ uv run uvicorn app.main:app --reload --port 8081
 ### Error: Database connection failed
 
 **Solution**: Check your `.env` file and ensure:
+
 1. Database is running
 2. DATABASE_URL is correct
 3. Database exists
@@ -153,6 +163,7 @@ uv run uvicorn app.main:app --reload --port 8081
 ## 🔄 Development Workflow
 
 ### 1. Start New Feature
+
 ```bash
 # Pull latest changes
 git pull
@@ -169,9 +180,9 @@ make dev-run
 
 ### 2. Make Changes
 
-- Edit code in `app/` directory
-- Server auto-reloads on file changes
-- Test in browser at `http://localhost:8080/docs`
+-   Edit code in `app/` directory
+-   Server auto-reloads on file changes
+-   Test in browser at `http://localhost:8080/docs`
 
 ### 3. Add New Database Changes
 
@@ -184,11 +195,13 @@ make dev-migrate
 ```
 
 ### 4. Run Tests
+
 ```bash
 make test-local
 ```
 
 ### 5. Commit Changes
+
 ```bash
 git add .
 git commit -m "Your message"
@@ -224,6 +237,7 @@ DB_ECHO=false
 ## 🎯 Testing Guest Registration
 
 ### Using curl:
+
 ```bash
 curl -X POST http://localhost:8080/api/v1/guests/register \
   -H "Content-Type: application/json" \
@@ -237,6 +251,7 @@ curl -X POST http://localhost:8080/api/v1/guests/register \
 ```
 
 ### Using Interactive Docs:
+
 1. Go to `http://localhost:8080/docs`
 2. Find "Guests" section
 3. Click "POST /api/v1/guests/register"
@@ -261,6 +276,6 @@ See `docs/DOCKER.md` for more Docker commands.
 
 ## 📚 Related Documentation
 
-- [Guest Registration API](./GUEST_REGISTRATION.md) - Full API documentation
-- [Docker Guide](./DOCKER.md) - Docker setup and commands
-- [Webhook Integration](./WEBHOOK_WAHA.md) - WhatsApp webhook setup
+-   [Guest Registration API](./GUEST_REGISTRATION.md) - Full API documentation
+-   [Docker Guide](./DOCKER.md) - Docker setup and commands
+-   [Webhook Integration](./WEBHOOK_WAHA.md) - WhatsApp webhook setup
