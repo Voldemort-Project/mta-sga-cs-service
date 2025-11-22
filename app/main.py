@@ -4,10 +4,19 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.database import close_db
+from app.core.exceptions import ComposeError
+from app.core.error_handler import (
+    compose_error_handler,
+    http_exception_handler,
+    validation_exception_handler,
+    general_exception_handler
+)
 
 # Configure logging
 logging.basicConfig(
@@ -51,6 +60,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register exception handlers
+# Order matters: more specific handlers should be registered first
+app.add_exception_handler(ComposeError, compose_error_handler)
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(Exception, general_exception_handler)
 
 # Include API router
 app.include_router(api_router)

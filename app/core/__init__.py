@@ -8,6 +8,7 @@ from app.core.pagination import (
     apply_keyword_search,
     paginate_query,
 )
+from app.core.exceptions import ComposeError
 
 __all__ = [
     "PaginationParams",
@@ -17,4 +18,5 @@ __all__ = [
     "apply_order_to_query",
     "apply_keyword_search",
     "paginate_query",
+    "ComposeError",
 ]

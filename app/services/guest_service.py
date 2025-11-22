@@ -4,10 +4,12 @@ from typing import Optional, List
 from uuid import UUID
 import logging
 
-from fastapi import HTTPException, status
+from fastapi import status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.pagination import PaginationParams, PaginatedResponse, paginate_query
+from app.core.exceptions import ComposeError
+from app.constants.error_codes import ErrorCode
 from app.repositories.guest_repository import GuestRepository
 from app.schemas.guest import GuestRegisterRequest, GuestRegisterResponse, GuestListItem
 from app.schemas.response import StandardResponse, create_paginated_response
@@ -49,24 +51,27 @@ class GuestService:
         # Get guest role
         guest_role = await self.repository.get_guest_role()
         if not guest_role:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Guest role not found in system. Please contact administrator."
+            raise ComposeError(
+                error_code=ErrorCode.Guest.GUEST_ROLE_NOT_FOUND,
+                message="Guest role not found in system. Please contact administrator.",
+                http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
         # Get room by number
         room = await self.repository.get_room_by_number(request.room_number, org_id)
         if not room:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Room {request.room_number} not found"
+            raise ComposeError(
+                error_code=ErrorCode.Guest.ROOM_NOT_FOUND,
+                message=f"Room {request.room_number} not found",
+                http_status_code=status.HTTP_404_NOT_FOUND
             )
 
         # Check if room is available
         if room.is_booked:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Room {request.room_number} is already booked"
+            raise ComposeError(
+                error_code=ErrorCode.Guest.ROOM_ALREADY_BOOKED,
+                message=f"Room {request.room_number} is already booked",
+                http_status_code=status.HTTP_400_BAD_REQUEST
             )
 
         try:
@@ -138,14 +143,16 @@ class GuestService:
                 status=checkin.status
             )
 
-        except HTTPException:
+        except ComposeError:
             await self.db.rollback()
             raise
         except Exception as e:
             await self.db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to register guest: {str(e)}"
+            raise ComposeError(
+                error_code=ErrorCode.Guest.REGISTRATION_FAILED,
+                message="Failed to register guest. Please try again or contact support.",
+                http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                original_error=e
             )
 
     async def list_guests(
