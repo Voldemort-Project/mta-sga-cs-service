@@ -7,9 +7,11 @@ import logging
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.pagination import PaginationParams, PaginatedResponse, paginate_query
 from app.repositories.guest_repository import GuestRepository
-from app.schemas.guest import GuestRegisterRequest, GuestRegisterResponse
+from app.schemas.guest import GuestRegisterRequest, GuestRegisterResponse, GuestListItem
 from app.models.message import MessageRole
+from app.models.user import User
 from app.integrations.waha import WahaService
 
 logger = logging.getLogger(__name__)
@@ -144,3 +146,48 @@ class GuestService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to register guest: {str(e)}"
             )
+
+    async def list_guests(
+        self,
+        org_id: UUID,
+        params: PaginationParams
+    ) -> PaginatedResponse[GuestListItem]:
+        """
+        List guests for an organization with pagination
+
+        Args:
+            org_id: Organization ID to filter guests
+            params: Pagination parameters (page, per_page, keyword, order)
+
+        Returns:
+            PaginatedResponse[GuestListItem]: Paginated list of guests
+        """
+        # Get base query for guests in the organization
+        query = self.repository.get_guests_query(org_id)
+
+        # Apply pagination, search, and ordering
+        result = await paginate_query(
+            db=self.db,
+            query=query,
+            params=params,
+            model=User,
+            search_fields=["name", "email", "mobile_phone"]
+        )
+
+        # Convert User objects to GuestListItem
+        guest_items = [
+            GuestListItem(
+                id=user.id,
+                name=user.name,
+                email=user.email,
+                mobile_phone=user.mobile_phone,
+                created_at=user.created_at,
+                updated_at=user.updated_at
+            )
+            for user in result.data
+        ]
+
+        return PaginatedResponse(
+            data=guest_items,
+            meta=result.meta
+        )

@@ -1,5 +1,5 @@
 """Guest schemas for registration and check-in"""
-from datetime import date
+from datetime import date, datetime
 from uuid import UUID
 from pydantic import BaseModel, EmailStr, Field
 
@@ -51,6 +51,32 @@ class GuestRegisterResponse(BaseModel):
                     "email": "john.doe@example.com",
                     "phone_number": "+6281234567890",
                     "status": "active"
+                }
+            ]
+        }
+    }
+
+
+class GuestListItem(BaseModel):
+    """Schema for guest list item"""
+    id: UUID = Field(..., description="Guest user ID")
+    name: str = Field(..., description="Guest full name")
+    email: str = Field(..., description="Guest email address")
+    mobile_phone: str | None = Field(None, description="Guest phone number")
+    created_at: datetime = Field(..., description="Registration date")
+    updated_at: datetime = Field(..., description="Last update date")
+
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "id": "123e4567-e89b-12d3-a456-426614174000",
+                    "name": "John Doe",
+                    "email": "john.doe@example.com",
+                    "mobile_phone": "+6281234567890",
+                    "created_at": "2024-01-15T10:30:00Z",
+                    "updated_at": "2024-01-15T10:30:00Z"
                 }
             ]
         }

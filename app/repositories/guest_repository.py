@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import Select
 
 from app.models.user import User
 from app.models.checkin import CheckinRoom
@@ -143,3 +144,37 @@ class GuestRepository:
             )
         )
         return result.scalar_one_or_none()
+
+    def get_guests_query(self, org_id: UUID) -> Select:
+        """Get base query for guests filtered by organization
+
+        Query starts from checkin_rooms table, then joins to users and roles.
+        Uses sessions table to link checkin_rooms to guest users.
+
+        Args:
+            org_id: Organization ID to filter guests
+
+        Returns:
+            SQLAlchemy Select query for guests with guest role in the organization
+        """
+        # Start from checkin_rooms table
+        # Join to sessions to get guest user (session.session_id = guest_user.id)
+        # Join to users to get user details
+        # Join to roles to filter only guest role
+        # Use distinct() to avoid duplicate users if they have multiple check-ins
+        query = (
+            select(User)
+            .select_from(CheckinRoom)
+            .join(Session, CheckinRoom.id == Session.checkin_room_id)
+            .join(User, Session.session_id == User.id)
+            .join(Role, User.role_id == Role.id)
+            .where(
+                CheckinRoom.org_id == org_id,
+                CheckinRoom.deleted_at.is_(None),
+                Session.deleted_at.is_(None),
+                Role.code == "guest",
+                User.deleted_at.is_(None)
+            )
+            .distinct()
+        )
+        return query
