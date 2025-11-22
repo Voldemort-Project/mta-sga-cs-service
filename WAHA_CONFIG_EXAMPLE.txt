@@ -1,0 +1,48 @@
+# ============================================
+# WAHA CONFIGURATION FOR .env FILE
+# ============================================
+#
+# Add these lines to your .env file:
+
+# WAHA (WhatsApp HTTP API)
+# Host URL where WAHA service is running
+WAHA_HOST=http://localhost:3000
+
+# API path for sending text messages
+WAHA_API_PATH=/api/sendText
+
+# Session name configured in WAHA
+WAHA_SESSION=default
+
+# API Key for WAHA authentication (optional, leave empty if not required)
+WAHA_API_KEY=your-secret-api-key-here
+
+# ============================================
+# NOTES:
+# ============================================
+#
+# 1. WAHA_HOST:
+#    - Local: http://localhost:3000
+#    - Docker: http://waha:3000
+#    - Production: https://waha.yourdomain.com
+#
+# 2. WAHA_API_PATH:
+#    - Default: /api/sendText
+#    - Do not change unless WAHA version requires it
+#
+# 3. WAHA_SESSION:
+#    - Must match the session name in WAHA
+#    - Default: "default"
+#    - Can be custom like: "hotel-wa", "main", etc.
+#
+# 4. WAHA_API_KEY:
+#    - Optional: Leave empty ("") if WAHA doesn't require authentication
+#    - Required: Set your API key if WAHA is configured with API key authentication
+#    - The key will be sent as "x-api-key" header in requests
+#
+# 5. Make sure WAHA service is running before starting the application
+#
+# 6. Configure WAHA webhook to point to:
+#    https://your-domain.com/api/v1/waha/webhook
+#
+# ============================================

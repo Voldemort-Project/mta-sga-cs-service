@@ -83,8 +83,7 @@ class AuthSyncService:
             print(f"[AuthSync] Creating new organization: {org_name} ({org_uuid})")
             organization = Organization(
                 id=org_uuid,
-                name=org_name,
-                address=None  # Will be updated later if needed
+                name=org_name
             )
             self.db.add(organization)
             await self.db.commit()
@@ -167,8 +166,7 @@ class AuthSyncService:
                 role_id=default_role.id,
                 name=name,
                 email=email,
-                phone=None,  # Not available from Keycloak token
-                id_card_number=None,  # Not available from Keycloak token
+                mobile_phone=None,  # Not available from Keycloak token
                 division_id=None  # Can be assigned later
             )
             self.db.add(user)
@@ -187,8 +185,8 @@ class AuthSyncService:
         Returns:
             Role: The default role
         """
-        # Look for existing "Keycloak User" role
-        stmt = select(Role).where(Role.name == "Keycloak User")
+        # Look for existing "Keycloak User" role by code
+        stmt = select(Role).where(Role.code == "keycloak_user")
         result = await self.db.execute(stmt)
         role = result.scalar_one_or_none()
 
@@ -196,14 +194,15 @@ class AuthSyncService:
             # Create default role
             print(f"[AuthSync] Default role not found, creating...")
             role = Role(
-                name="Keycloak User"
+                name="Keycloak User",
+                code="keycloak_user"
             )
             self.db.add(role)
             await self.db.commit()
             await self.db.refresh(role)
-            print(f"[AuthSync] Default role created: {role.name} ({role.id})")
+            print(f"[AuthSync] Default role created: {role.name} ({role.code}) ({role.id})")
         else:
-            print(f"[AuthSync] Default role found: {role.name} ({role.id})")
+            print(f"[AuthSync] Default role found: {role.name} ({role.code}) ({role.id})")
 
         return role
 

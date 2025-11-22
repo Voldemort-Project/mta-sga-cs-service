@@ -4,10 +4,10 @@ from app.models.division import Division
 from app.models.role import Role
 from app.models.user import User
 from app.models.room import Room
-from app.models.checkin import Checkin
-from app.models.request import Request
-from app.models.request_assignment import RequestAssignment
-from app.models.chat import Chat
+from app.models.checkin import CheckinRoom
+from app.models.order import Order, OrderStatus
+from app.models.session import Session
+from app.models.message import Message, MessageRole
 
 __all__ = [
     "Organization",
@@ -15,8 +15,10 @@ __all__ = [
     "Role",
     "User",
     "Room",
-    "Checkin",
-    "Request",
-    "RequestAssignment",
-    "Chat",
+    "CheckinRoom",
+    "Order",
+    "OrderStatus",
+    "Session",
+    "Message",
+    "MessageRole",
 ]

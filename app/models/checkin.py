@@ -1,31 +1,32 @@
-"""Checkin model"""
+"""CheckinRoom model"""
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, String, DateTime, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, Date, Time, TIMESTAMP, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
 
 
-class Checkin(Base):
-    """Checkin model"""
+class CheckinRoom(Base):
+    """CheckinRoom model"""
 
-    __tablename__ = "checkins"
+    __tablename__ = "checkin_rooms"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)  # bisa null
-    room_id = Column(UUID(as_uuid=True), ForeignKey("rooms.id", ondelete="RESTRICT"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)  # user dengan role=guest
-    checkin_time = Column(DateTime, nullable=False)
-    checkout_time = Column(DateTime)
-    status = Column(String, nullable=False)  # active, completed, cancelled
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)
+    room_id = Column(ARRAY(UUID(as_uuid=True)), nullable=True)
+    checkin_date = Column(Date, nullable=True)
+    checkin_time = Column(Time, nullable=True)
+    checkout_date = Column(Date, nullable=True)
+    checkout_time = Column(Time, nullable=True)
+    status = Column(String, nullable=True)
+    created_at = Column(TIMESTAMP(timezone=True), server_default="now()", nullable=False)
+    updated_at = Column(TIMESTAMP(timezone=True), server_default="now()", onupdate=datetime.utcnow, nullable=False)
+    deleted_at = Column(TIMESTAMP(timezone=True), nullable=True)
 
     # Relationships
-    organization = relationship("Organization", back_populates="checkins", foreign_keys=[org_id])
-    room = relationship("Room", back_populates="checkins", foreign_keys=[room_id])
-    user = relationship("User", back_populates="checkins", foreign_keys=[user_id])
-    requests = relationship("Request", back_populates="checkin", cascade="all, delete-orphan")
+    organization = relationship("Organization", back_populates="checkin_rooms", foreign_keys=[org_id])
+    orders = relationship("Order", back_populates="checkin", foreign_keys="Order.checkin_id")
+    sessions = relationship("Session", back_populates="checkin_room", foreign_keys="Session.checkin_room_id")

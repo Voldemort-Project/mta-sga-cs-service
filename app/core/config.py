@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "RS256"
     jwt_audience: str | None = None  # Optional, will use client_id if not set
 
+    # WAHA (WhatsApp HTTP API)
+    waha_host: str = "http://localhost:3000"
+    waha_api_path: str = "/api/sendText"
+    waha_session: str = "default"
+    waha_api_key: str = ""  # X-API-Key for WAHA authentication
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
