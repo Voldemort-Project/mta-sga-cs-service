@@ -1,5 +1,7 @@
 from typing import Any, Dict, List, Optional
+from uuid import UUID
 from pydantic import BaseModel, Field
+from enum import Enum
 
 
 class MediaS3(BaseModel):
@@ -86,3 +88,26 @@ class WahaWebhookRequest(BaseModel):
 class WahaWebhookResponse(BaseModel):
     status: str
     message: str
+
+
+class OrderCategory(str, Enum):
+    """Order category enum"""
+    housekeeping = "housekeeping"
+    restaurant = "restaurant"
+
+
+class OrderWebhookRequest(BaseModel):
+    """Request schema for order webhook"""
+    session_id: UUID = Field(..., description="Session ID (required)")
+    category: OrderCategory = Field(..., description="Order category: 'housekeeping' or 'restaurant' (required)")
+    title: str = Field(..., description="Order title (required)")
+    description: str = Field(..., description="Order description (required)")
+    note: Optional[str] = Field(None, description="Order note (optional, nullable)")
+    additional_note: Optional[str] = Field(None, description="Order additional note (optional, nullable)")
+
+
+class OrderWebhookResponse(BaseModel):
+    """Response schema for order webhook"""
+    status: str
+    message: str
+    order_id: Optional[UUID] = None

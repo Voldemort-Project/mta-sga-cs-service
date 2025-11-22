@@ -1,6 +1,5 @@
 """Webhook service for handling WAHA messages"""
 import logging
-from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.guest_repository import GuestRepository

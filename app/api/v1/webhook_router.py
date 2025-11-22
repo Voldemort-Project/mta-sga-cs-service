@@ -2,8 +2,15 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.schemas.webhook import WahaWebhookRequest, WahaWebhookResponse
+from app.core.exceptions import ComposeError
+from app.schemas.webhook import (
+    WahaWebhookRequest,
+    WahaWebhookResponse,
+    OrderWebhookRequest,
+    OrderWebhookResponse
+)
 from app.services.webhook_service import WebhookService
+from app.services.order_webhook_service import OrderWebhookService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -70,3 +77,49 @@ async def handle_message_event(webhook_data: WahaWebhookRequest, db: AsyncSessio
 
     if payload.replyTo:
         logger.info(f"Message is a reply to: {payload.replyTo.id}")
+
+
+@router.post("/webhook/order", response_model=OrderWebhookResponse)
+async def order_webhook(
+    request: Request,
+    webhook_data: OrderWebhookRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Webhook endpoint to receive order creation requests.
+
+    This endpoint receives order data and creates an order in the system.
+    It is separate from the WAHA webhook endpoint.
+
+    Request body:
+    - session_id (required): Session ID to get checkin_id
+    - category (required): Order category ('housekeeping' or 'restaurant')
+    - title (required): Order title
+    - description (required): Order description
+    - note (optional): Order note
+    - additional_note (optional): Additional order note
+    """
+    try:
+        # Log the incoming webhook
+        logger.info(
+            f"Received order webhook: session_id={webhook_data.session_id}, "
+            f"category={webhook_data.category}, title={webhook_data.title}"
+        )
+
+        # Create order via service
+        order_service = OrderWebhookService(db)
+        order_id = await order_service.create_order_from_webhook(webhook_data)
+
+        return OrderWebhookResponse(
+            status="success",
+            message="Order created successfully",
+            order_id=order_id
+        )
+
+    except ComposeError:
+        # Let ComposeError pass through to be handled by error handler middleware
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error processing order webhook: {str(e)}", exc_info=True)
+        # Re-raise to let general exception handler handle it
+        raise

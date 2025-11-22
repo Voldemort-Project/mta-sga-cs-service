@@ -4,7 +4,6 @@ from app.core.security import (
     get_current_user,
     get_current_user_with_sync,
     require_role,
-    require_role_with_sync,
     require_permission,
     require_any_role,
     require_all_roles,

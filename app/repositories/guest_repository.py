@@ -13,6 +13,7 @@ from app.models.room import Room
 from app.models.role import Role
 from app.models.session import Session
 from app.models.message import Message, MessageRole
+from app.models.order import Order
 
 
 class GuestRepository:
@@ -144,6 +145,53 @@ class GuestRepository:
             )
         )
         return result.scalar_one_or_none()
+
+    async def get_session_by_id(self, session_id: UUID) -> Optional[Session]:
+        """Get session by session ID"""
+        result = await self.db.execute(
+            select(Session).where(
+                Session.id == session_id,
+                Session.deleted_at.is_(None)
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def create_order(
+        self,
+        checkin_id: UUID,
+        category: str,
+        title: str,
+        description: str,
+        order_number: str,
+        notes: Optional[str] = None,
+        additional_notes: Optional[str] = None,
+        org_id: Optional[UUID] = None
+    ) -> Order:
+        """Create a new order
+
+        Args:
+            checkin_id: Check-in room ID
+            category: Order category (housekeeping or restaurant)
+            title: Order title
+            description: Order description
+            order_number: Unique order number
+            notes: Order notes (optional)
+            additional_notes: Additional order notes (optional)
+            org_id: Organization ID (optional)
+        """
+        order = Order(
+            checkin_id=checkin_id,
+            org_id=org_id,
+            category=category,
+            title=title,
+            description=description,
+            notes=notes,
+            additional_notes=additional_notes,
+            order_number=order_number
+        )
+        self.db.add(order)
+        await self.db.flush()
+        return order
 
     def get_guests_query(self, org_id: UUID) -> Select:
         """Get base query for guests filtered by organization
