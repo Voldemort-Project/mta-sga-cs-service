@@ -26,6 +26,7 @@ class GuestService:
     async def register_guest(
         self,
         request: GuestRegisterRequest,
+        user_id: Optional[UUID] = None,
         org_id: Optional[UUID] = None
     ) -> GuestRegisterResponse:
         """
@@ -33,6 +34,7 @@ class GuestService:
 
         Args:
             request: Guest registration request data
+            user_id: User ID of the admin who is registering the guest
             org_id: Organization ID (optional)
 
         Returns:
@@ -80,7 +82,8 @@ class GuestService:
                 room_ids=[room.id],
                 checkin_date=request.checkin_date,
                 checkin_time=current_time,
-                org_id=org_id or room.org_id
+                org_id=org_id or room.org_id,
+                user_id=user_id
             )
 
             # Update room status to booked

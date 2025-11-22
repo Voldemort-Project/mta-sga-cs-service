@@ -61,11 +61,21 @@ class GuestRepository:
         room_ids: List[UUID],
         checkin_date: date,
         checkin_time: time,
-        org_id: UUID
+        org_id: UUID,
+        user_id: Optional[UUID] = None
     ) -> CheckinRoom:
-        """Create a new check-in"""
+        """Create a new check-in
+
+        Args:
+            room_ids: List of room IDs for check-in
+            checkin_date: Check-in date
+            checkin_time: Check-in time
+            org_id: Organization ID
+            user_id: User ID of the admin who registered the guest (optional)
+        """
         checkin = CheckinRoom(
             org_id=org_id,
+            user_id=user_id,
             room_id=room_ids,
             checkin_date=checkin_date,
             checkin_time=checkin_time,
