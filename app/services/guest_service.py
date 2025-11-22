@@ -1,6 +1,6 @@
 """Guest service for business logic"""
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 import logging
 
@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.pagination import PaginationParams, PaginatedResponse, paginate_query
 from app.repositories.guest_repository import GuestRepository
 from app.schemas.guest import GuestRegisterRequest, GuestRegisterResponse, GuestListItem
+from app.schemas.response import StandardResponse, create_paginated_response
 from app.models.message import MessageRole
 from app.models.user import User
 from app.integrations.waha import WahaService
@@ -151,7 +152,7 @@ class GuestService:
         self,
         org_id: UUID,
         params: PaginationParams
-    ) -> PaginatedResponse[GuestListItem]:
+    ) -> StandardResponse[List[GuestListItem]]:
         """
         List guests for an organization with pagination
 
@@ -160,7 +161,7 @@ class GuestService:
             params: Pagination parameters (page, per_page, keyword, order)
 
         Returns:
-            PaginatedResponse[GuestListItem]: Paginated list of guests
+            StandardResponse[List[GuestListItem]]: Standard response with paginated list of guests
         """
         # Get base query for guests in the organization
         query = self.repository.get_guests_query(org_id)
@@ -187,7 +188,10 @@ class GuestService:
             for user in result.data
         ]
 
-        return PaginatedResponse(
+        # Return standard response with pagination
+        return create_paginated_response(
             data=guest_items,
-            meta=result.meta
+            page=result.meta.page,
+            per_page=result.meta.per_page,
+            total=result.meta.total
         )

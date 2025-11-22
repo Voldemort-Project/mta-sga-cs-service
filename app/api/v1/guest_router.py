@@ -1,13 +1,15 @@
 """Guest registration router"""
 import uuid
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.pagination import PaginationParams, PaginatedResponse
+from app.core.pagination import PaginationParams
 from app.core.security import get_current_user
 from app.schemas.auth import TokenData
 from app.schemas.guest import GuestRegisterRequest, GuestRegisterResponse, GuestListItem
+from app.schemas.response import StandardResponse
 from app.services.guest_service import GuestService
 
 router = APIRouter(prefix="/guests", tags=["Guests"])
@@ -56,7 +58,7 @@ async def register_guest(
 
 @router.get(
     "",
-    response_model=PaginatedResponse[GuestListItem],
+    response_model=StandardResponse[List[GuestListItem]],
     status_code=status.HTTP_200_OK,
     summary="List Guests",
     description="Get paginated list of guests registered under the current user's organization"
@@ -68,7 +70,7 @@ async def list_guests(
     order: str = Query(None, description="Order string (e.g., 'created_at:desc;name:asc')"),
     current_user: TokenData = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
-) -> PaginatedResponse[GuestListItem]:
+) -> StandardResponse[List[GuestListItem]]:
     """
     Get paginated list of guests for the current user's organization.
 
@@ -87,7 +89,7 @@ async def list_guests(
         db: Database session dependency
 
     Returns:
-        PaginatedResponse[GuestListItem]: Paginated list of guests with metadata
+        StandardResponse[List[GuestListItem]]: Paginated list of guests with metadata
 
     Raises:
         400: Invalid pagination parameters
