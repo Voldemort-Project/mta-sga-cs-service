@@ -39,3 +39,6 @@ htmlcov/
 *.log
 logs/
 .cursor/
+
+http_call_experiment/
+erd_diagram/

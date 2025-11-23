@@ -138,6 +138,7 @@ class GuestService:
             return GuestRegisterResponse(
                 user_id=user.id,
                 checkin_id=checkin.id,
+                session_id=session.id,
                 full_name=user.name,
                 room_number=room.room_number,
                 checkin_date=request.checkin_date,

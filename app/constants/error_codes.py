@@ -67,6 +67,16 @@ class ErrorCode:
         LIST_ORDERS_FAILED = "5_000_002_0000001"
 
     # ============================================
+    # H2H Integration Errors (003)
+    # ============================================
+    class H2H:
+        """H2H integration related errors"""
+        # Internal Server Error (500)
+        CONNECTION_FAILED = "5_000_003_0000001"
+        AGENT_CREATION_FAILED = "5_000_003_0000002"
+        UNEXPECTED_ERROR = "5_000_003_0000003"
+
+    # ============================================
     # Add more categories below as needed
     # ============================================
     # class Room:

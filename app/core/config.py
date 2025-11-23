@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     waha_session: str = "default"
     waha_api_key: str = ""  # X-API-Key for WAHA authentication
 
+    # H2H Agent Router Integration
+    h2h_agent_router_host: str = "http://localhost:8000"
+    h2h_agent_router_path: str = "/v2/agents/create"
+    h2h_agent_router_api_key: str = ""  # X-API-Key for H2H Agent Router authentication
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
