@@ -1,16 +1,24 @@
 from fastapi import APIRouter, Request, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 
 from app.core.database import get_db
 from app.core.exceptions import ComposeError
+from app.constants.error_codes import ErrorCode
 from app.schemas.webhook import (
     WahaWebhookRequest,
     WahaWebhookResponse,
     OrderWebhookRequest,
-    OrderWebhookResponse
+    OrderWebhookResponse,
+    SendMessageRequest
 )
+from app.schemas.response import StandardResponse, create_success_response
+from app.models.session import Session
+from app.models.user import User
 from app.services.webhook_service import WebhookService
 from app.services.order_webhook_service import OrderWebhookService
+from app.integrations.waha.waha_service import WahaService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -120,5 +128,86 @@ async def order_webhook(
         raise
     except Exception as e:
         logger.error(f"Unexpected error processing order webhook: {str(e)}", exc_info=True)
+        # Re-raise to let general exception handler handle it
+        raise
+
+
+@router.post("/send-message", response_model=StandardResponse[dict])
+async def send_message(
+    request: Request,
+    webhook_data: SendMessageRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Webhook endpoint to send WhatsApp message to user via WAHA.
+
+    This endpoint receives a session_id and message, retrieves the user's
+    mobile phone number from the session, and sends the message via WAHA.
+
+    Request body:
+    - session_id (required): Session ID
+    - message (required): Message text to send
+    """
+    try:
+        # Log the incoming webhook
+        logger.info(
+            f"Received send-message webhook: session_id={webhook_data.session_id}, "
+            f"message_length={len(webhook_data.message)}"
+        )
+
+        # Get session with joined user to get mobile_phone
+        result = await db.execute(
+            select(Session)
+            .options(joinedload(Session.user))
+            .where(
+                Session.id == webhook_data.session_id,
+                Session.deleted_at.is_(None)
+            )
+        )
+        session = result.scalar_one_or_none()
+
+        if not session:
+            raise ComposeError(
+                error_code=ErrorCode.General.NOT_FOUND,
+                message=f"Session {webhook_data.session_id} not found",
+                http_status_code=404
+            )
+
+        if not session.user:
+            raise ComposeError(
+                error_code=ErrorCode.General.NOT_FOUND,
+                message=f"User not found for session {webhook_data.session_id}",
+                http_status_code=404
+            )
+
+        if not session.user.mobile_phone:
+            raise ComposeError(
+                error_code=ErrorCode.General.BAD_REQUEST,
+                message=f"User {session.user.id} does not have a mobile phone number",
+                http_status_code=400
+            )
+
+        # Send message via WAHA
+        waha_service = WahaService()
+        await waha_service.send_text_message(
+            phone_number=session.user.mobile_phone,
+            text=webhook_data.message
+        )
+
+        logger.info(
+            f"Message sent successfully to {session.user.mobile_phone} "
+            f"for session {webhook_data.session_id}"
+        )
+
+        return create_success_response(
+            data={"session_id": str(webhook_data.session_id)},
+            message="Message sent successfully"
+        )
+
+    except ComposeError:
+        # Let ComposeError pass through to be handled by error handler middleware
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error processing send-message webhook: {str(e)}", exc_info=True)
         # Re-raise to let general exception handler handle it
         raise

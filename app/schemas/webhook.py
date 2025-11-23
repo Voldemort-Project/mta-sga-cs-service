@@ -121,3 +121,9 @@ class OrderWebhookResponse(BaseModel):
     status: str
     message: str
     order_id: Optional[UUID] = None
+
+
+class SendMessageRequest(BaseModel):
+    """Request schema for send message webhook"""
+    session_id: UUID = Field(..., description="Session ID (required)")
+    message: str = Field(..., description="Message text to send (required)")
