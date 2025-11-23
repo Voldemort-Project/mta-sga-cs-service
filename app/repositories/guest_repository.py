@@ -213,6 +213,24 @@ class GuestRepository:
         await self.db.flush()
         return order
 
+    def get_messages_query(self, session_id: UUID) -> Select:
+        """Get base query for messages filtered by session_id
+
+        Args:
+            session_id: Session ID to filter messages
+
+        Returns:
+            SQLAlchemy Select query for messages with session_id filter
+        """
+        query = (
+            select(Message)
+            .where(
+                Message.session_id == session_id,
+                Message.deleted_at.is_(None)
+            )
+        )
+        return query
+
     def get_guests_query(self, org_id: UUID) -> Select:
         """Get base query for guests filtered by organization
 
