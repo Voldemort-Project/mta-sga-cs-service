@@ -15,10 +15,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(prefix="/webhook", tags=["Webhook"])
 
 
-@router.post("/webhook/waha", response_model=WahaWebhookResponse)
+@router.post("/waha", response_model=WahaWebhookResponse)
 async def waha_webhook(
     request: Request,
     webhook_data: WahaWebhookRequest,
@@ -79,7 +79,7 @@ async def handle_message_event(webhook_data: WahaWebhookRequest, db: AsyncSessio
         logger.info(f"Message is a reply to: {payload.replyTo.id}")
 
 
-@router.post("/webhook/order", response_model=OrderWebhookResponse)
+@router.post("/order", response_model=OrderWebhookResponse)
 async def order_webhook(
     request: Request,
     webhook_data: OrderWebhookRequest,
