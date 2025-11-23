@@ -2,14 +2,14 @@
 import uuid
 import logging
 from typing import List
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.pagination import PaginationParams
 from app.core.security import get_current_user
 from app.schemas.auth import TokenData
-from app.schemas.guest import GuestRegisterRequest, GuestRegisterResponse, GuestListItem
+from app.schemas.guest import GuestRegisterRequest, GuestRegisterResponse, GuestListItem, GuestCheckoutResponse
 from app.schemas.response import StandardResponse, create_success_response
 from app.services.guest_service import GuestService
 from app.integrations.h2h import H2HAgentRouterService
@@ -154,3 +154,55 @@ async def list_guests(
 
     service = GuestService(db)
     return await service.list_guests(org_id=org_id, params=params)
+
+
+@router.post(
+    "/{guest_id}/checkout",
+    response_model=StandardResponse[GuestCheckoutResponse],
+    status_code=status.HTTP_200_OK,
+    summary="Checkout Guest",
+    description="Checkout a guest by terminating their session. All orders must be completed first."
+)
+async def checkout_guest(
+    guest_id: uuid.UUID = Path(..., description="Guest user ID to checkout"),
+    current_user: TokenData = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+) -> StandardResponse[GuestCheckoutResponse]:
+    """
+    Checkout a guest from the hotel.
+
+    This endpoint will:
+    - Verify that all guest orders are completed (status not pending, assigned, or in_progress)
+    - Terminate the guest's active session
+    - Return checkout confirmation
+
+    Args:
+        guest_id: Guest user ID to checkout
+        current_user: Current authenticated user (from token)
+        db: Database session dependency
+
+    Returns:
+        StandardResponse[GuestCheckoutResponse]: Checkout confirmation with session details
+
+    Raises:
+        400: Guest has incomplete orders
+        404: Guest not found or active session not found
+        500: Internal server error
+    """
+    service = GuestService(db)
+    result = await service.checkout_guest(guest_id=guest_id)
+
+    # Convert dict response to GuestCheckoutResponse
+    checkout_data = result.data
+    checkout_response = GuestCheckoutResponse(
+        guest_id=uuid.UUID(checkout_data["guest_id"]),
+        session_id=uuid.UUID(checkout_data["session_id"]),
+        status=checkout_data["status"],
+        session_terminated_at=checkout_data.get("session_terminated_at"),
+        session_duration_seconds=checkout_data.get("session_duration_seconds")
+    )
+
+    return create_success_response(
+        data=checkout_response,
+        message=result.message
+    )

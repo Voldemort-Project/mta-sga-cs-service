@@ -44,13 +44,17 @@ class ErrorCode:
         """Guest service related errors"""
         # Not Found (404)
         ROOM_NOT_FOUND = "4_000_001_0000001"
+        GUEST_NOT_FOUND = "4_000_001_0000003"
+        SESSION_NOT_FOUND = "4_000_001_0000004"
 
         # Bad Request (400)
         ROOM_ALREADY_BOOKED = "4_000_001_0000002"
+        INCOMPLETE_ORDERS_EXIST = "4_000_001_0000005"
 
         # Internal Server Error (500)
         GUEST_ROLE_NOT_FOUND = "5_000_001_0000001"
         REGISTRATION_FAILED = "5_000_001_0000002"
+        CHECKOUT_FAILED = "5_000_001_0000003"
 
     # ============================================
     # Order Service Errors (002)

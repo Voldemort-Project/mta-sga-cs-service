@@ -83,3 +83,26 @@ class GuestListItem(BaseModel):
             ]
         }
     }
+
+
+class GuestCheckoutResponse(BaseModel):
+    """Response schema for guest checkout"""
+    guest_id: UUID = Field(..., description="Guest user ID")
+    session_id: UUID = Field(..., description="Terminated session ID")
+    status: str = Field(..., description="Checkout status")
+    session_terminated_at: str | None = Field(None, description="Session termination timestamp")
+    session_duration_seconds: int | None = Field(None, description="Session duration in seconds")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "guest_id": "123e4567-e89b-12d3-a456-426614174000",
+                    "session_id": "123e4567-e89b-12d3-a456-426614174002",
+                    "status": "checked_out",
+                    "session_terminated_at": "2024-01-20T14:30:00Z",
+                    "session_duration_seconds": 432000
+                }
+            ]
+        }
+    }

@@ -12,7 +12,7 @@ from app.core.exceptions import ComposeError
 from app.constants.error_codes import ErrorCode
 from app.repositories.guest_repository import GuestRepository
 from app.schemas.guest import GuestRegisterRequest, GuestRegisterResponse, GuestListItem
-from app.schemas.response import StandardResponse, create_paginated_response
+from app.schemas.response import StandardResponse, create_paginated_response, create_success_response
 from app.models.message import MessageRole
 from app.models.user import User
 from app.models.session import SessionStatus, SessionMode
@@ -206,3 +206,93 @@ class GuestService:
             per_page=result.meta.per_page,
             total=result.meta.total
         )
+
+    async def checkout_guest(
+        self,
+        guest_id: UUID
+    ) -> StandardResponse[dict]:
+        """
+        Checkout a guest by terminating their session
+
+        This method will:
+        1. Check if guest has any incomplete orders (pending, assigned, in_progress)
+        2. If incomplete orders exist, raise an error
+        3. Get the active session for the guest
+        4. Terminate the session
+        5. Return success response
+
+        Args:
+            guest_id: Guest user ID to checkout
+
+        Returns:
+            StandardResponse[dict]: Success response with checkout details
+
+        Raises:
+            ComposeError: If guest not found, incomplete orders exist, or session not found
+        """
+        # Check if guest exists
+        guest = await self.repository.get_user_by_id(guest_id)
+        if not guest:
+            raise ComposeError(
+                error_code=ErrorCode.Guest.GUEST_NOT_FOUND,
+                message=f"Guest with ID {guest_id} not found",
+                http_status_code=status.HTTP_404_NOT_FOUND
+            )
+
+        # Check if guest has incomplete orders
+        incomplete_orders = await self.repository.get_incomplete_orders_by_guest_id(guest_id)
+        if incomplete_orders:
+            order_numbers = [order.order_number for order in incomplete_orders]
+            raise ComposeError(
+                error_code=ErrorCode.Guest.INCOMPLETE_ORDERS_EXIST,
+                message=f"Guest has incomplete orders that must be completed before checkout. Order numbers: {', '.join(order_numbers)}",
+                http_status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get active session for the guest
+        session = await self.repository.get_active_session_by_user_id(guest_id)
+        if not session:
+            raise ComposeError(
+                error_code=ErrorCode.Guest.SESSION_NOT_FOUND,
+                message=f"Active session not found for guest {guest_id}",
+                http_status_code=status.HTTP_404_NOT_FOUND
+            )
+
+        try:
+            # Terminate the session
+            terminated_session = await self.repository.terminate_session(session.id)
+            if not terminated_session:
+                raise ComposeError(
+                    error_code=ErrorCode.Guest.SESSION_NOT_FOUND,
+                    message=f"Failed to terminate session {session.id}",
+                    http_status_code=status.HTTP_404_NOT_FOUND
+                )
+
+            # Commit transaction
+            await self.db.commit()
+            logger.info(f"Guest {guest_id} checked out successfully. Session {session.id} terminated.")
+
+            # Return success response
+            return create_success_response(
+                data={
+                    "guest_id": str(guest_id),
+                    "session_id": str(terminated_session.id),
+                    "status": "checked_out",
+                    "session_terminated_at": terminated_session.end.isoformat() if terminated_session.end else None,
+                    "session_duration_seconds": terminated_session.duration
+                },
+                message="Guest checked out successfully"
+            )
+
+        except ComposeError:
+            await self.db.rollback()
+            raise
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Failed to checkout guest {guest_id}: {str(e)}", exc_info=True)
+            raise ComposeError(
+                error_code=ErrorCode.Guest.CHECKOUT_FAILED,
+                message="Failed to checkout guest. Please try again or contact support.",
+                http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                original_error=e
+            )

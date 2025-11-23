@@ -1,5 +1,5 @@
 """Guest repository for database operations"""
-from datetime import datetime, date, time
+from datetime import datetime, date, time, timezone
 from typing import Optional, List
 from uuid import UUID
 
@@ -112,7 +112,7 @@ class GuestRepository:
             checkin_room_id=checkin_room_id,
             status=status or SessionStatus.open,
             mode=mode or SessionMode.agent,
-            start=datetime.utcnow()
+            start=datetime.now(timezone.utc)
         )
         self.db.add(session)
         await self.db.flush()
@@ -138,6 +138,16 @@ class GuestRepository:
         """Get user by phone number"""
         result = await self.db.execute(
             select(User).where(User.mobile_phone == phone)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_user_by_id(self, user_id: UUID) -> Optional[User]:
+        """Get user by ID"""
+        result = await self.db.execute(
+            select(User).where(
+                User.id == user_id,
+                User.deleted_at.is_(None)
+            )
         )
         return result.scalar_one_or_none()
 
@@ -264,3 +274,63 @@ class GuestRepository:
             .distinct()
         )
         return query
+
+    async def get_incomplete_orders_by_guest_id(self, guest_id: UUID) -> List[Order]:
+        """Get all incomplete orders for a guest
+
+        Incomplete orders are those with status: pending, assigned, or in_progress
+
+        Args:
+            guest_id: Guest user ID
+
+        Returns:
+            List of incomplete Order objects
+        """
+        from app.models.order import OrderStatus
+
+        result = await self.db.execute(
+            select(Order).where(
+                Order.guest_id == guest_id,
+                Order.status.in_([
+                    OrderStatus.pending,
+                    OrderStatus.assigned,
+                    OrderStatus.in_progress
+                ]),
+                Order.deleted_at.is_(None)
+            )
+        )
+        return list(result.scalars().all())
+
+    async def terminate_session(self, session_id: UUID) -> Optional[Session]:
+        """Terminate a session by setting status to terminated and calculating duration
+
+        Args:
+            session_id: Session ID to terminate
+
+        Returns:
+            Updated Session object or None if session not found
+        """
+        from app.models.session import SessionStatus
+
+        session = await self.get_session_by_id(session_id)
+        if not session:
+            return None
+
+        # Set end time to current time (timezone-aware UTC)
+        end_time = datetime.now(timezone.utc)
+        session.end = end_time
+        session.status = SessionStatus.terminated
+
+        # Calculate duration if start time exists
+        if session.start:
+            # Ensure both datetimes are timezone-aware for comparison
+            # If session.start is naive, make it timezone-aware (UTC)
+            start_time = session.start
+            if start_time.tzinfo is None:
+                start_time = start_time.replace(tzinfo=timezone.utc)
+
+            duration_seconds = int((end_time - start_time).total_seconds())
+            session.duration = duration_seconds
+
+        await self.db.flush()
+        return session
