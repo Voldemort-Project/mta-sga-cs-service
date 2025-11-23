@@ -5,6 +5,7 @@ from typing import Optional, List
 from pydantic import BaseModel, Field
 
 from app.models.order import OrderStatus
+from app.models.order_item import OrderItem
 
 
 class RoomItem(BaseModel):
@@ -47,10 +48,25 @@ class GuestItem(BaseModel):
     }
 
 
+class OrderItemSchema(BaseModel):
+    """Schema for order item in order response"""
+    id: UUID = Field(..., description="Order item ID")
+    title: str = Field(..., description="Order item title")
+    description: Optional[str] = Field(None, description="Order item description")
+    qty: Optional[int] = Field(None, description="Quantity")
+    price: Optional[float] = Field(None, description="Price")
+    note: Optional[str] = Field(None, description="Order item note")
+
+    model_config = {
+        "from_attributes": True
+    }
+
+
 class SessionItem(BaseModel):
     """Schema for session item in order response"""
     id: UUID = Field(..., description="Session ID")
-    is_active: Optional[bool] = Field(None, description="Session active status")
+    status: Optional[str] = Field(None, description="Session status")
+    mode: Optional[str] = Field(None, description="Session mode")
     start: Optional[datetime] = Field(None, description="Session start time")
     end: Optional[datetime] = Field(None, description="Session end time")
     duration: Optional[int] = Field(None, description="Session duration")
@@ -68,10 +84,10 @@ class OrderListItem(BaseModel):
     order_date: Optional[date] = Field(None, description="Order date")
     order_status: Optional[OrderStatus] = Field(None, description="Order status")
     category: str = Field(..., description="Order category")
-    title: str = Field(..., description="Order title")
-    description: Optional[str] = Field(None, description="Order description")
     note: Optional[str] = Field(None, description="Order notes")
     additional_note: Optional[str] = Field(None, description="Additional order notes")
+    total_amount: Optional[float] = Field(None, description="Total amount")
+    items: List[OrderItemSchema] = Field(default_factory=list, description="List of order items")
     session: Optional[SessionItem] = Field(None, description="Associated session")
     checkin_rooms: Optional[CheckinRoomItem] = Field(None, description="Associated check-in room")
     created_at: datetime = Field(..., description="Order creation date")
@@ -86,13 +102,23 @@ class OrderListItem(BaseModel):
                 "order_date": "2025-01-01",
                 "order_status": "pending",
                 "category": "housekeeping",
-                "title": "Title",
-                "description": "Description",
                 "note": "Note",
                 "additional_note": "Additional Note",
+                "total_amount": 100.0,
+                "items": [
+                    {
+                        "id": "123e4567-e89b-12d3-a456-426614174005",
+                        "title": "Item Title",
+                        "description": "Item Description",
+                        "qty": 1,
+                        "price": 100.0,
+                        "note": "Item note"
+                    }
+                ],
                 "session": {
                     "id": "123e4567-e89b-12d3-a456-426614174001",
-                    "is_active": True,
+                    "status": "open",
+                    "mode": "agent",
                     "start": "2025-01-01T10:00:00Z",
                     "end": None,
                     "duration": None,

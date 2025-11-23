@@ -15,6 +15,7 @@ from app.schemas.guest import GuestRegisterRequest, GuestRegisterResponse, Guest
 from app.schemas.response import StandardResponse, create_paginated_response
 from app.models.message import MessageRole
 from app.models.user import User
+from app.models.session import SessionStatus, SessionMode
 from app.integrations.waha import WahaService
 
 logger = logging.getLogger(__name__)
@@ -87,7 +88,7 @@ class GuestService:
             # Create check-in with current time
             current_time = datetime.now().time()
             checkin = await self.repository.create_checkin(
-                room_ids=[room.id],
+                room_id=room.id,
                 checkin_date=request.checkin_date,
                 checkin_time=current_time,
                 org_id=org_id or room.org_id,
@@ -100,7 +101,9 @@ class GuestService:
             # Create chat session for the guest
             session = await self.repository.create_session(
                 user_id=user.id,
-                checkin_room_id=checkin.id
+                checkin_room_id=checkin.id,
+                status=SessionStatus.open,
+                mode=SessionMode.agent
             )
 
             # Create welcome message and save to database

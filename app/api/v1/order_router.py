@@ -25,7 +25,7 @@ router = APIRouter(prefix="/orders", tags=["Orders"])
 async def list_orders(
     page: int = Query(1, ge=1, description="Current page number"),
     per_page: int = Query(10, ge=1, le=100, description="Items per page"),
-    keyword: Optional[str] = Query(None, description="Search keyword (searches in order_number, title, description, category)"),
+    keyword: Optional[str] = Query(None, description="Search keyword (searches in order_number, category)"),
     order: Optional[str] = Query(None, description="Order string (e.g., 'created_at:desc;order_number:asc')"),
     current_user: TokenData = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
@@ -41,7 +41,7 @@ async def list_orders(
     Args:
         page: Page number (starts from 1)
         per_page: Number of items per page (1-100)
-        keyword: Optional search keyword to filter by order_number, title, description, or category
+        keyword: Optional search keyword to filter by order_number or category
         order: Optional order string in format "field:direction;field2:direction2"
                e.g., "created_at:desc;order_number:asc"
         current_user: Current authenticated user (from token)

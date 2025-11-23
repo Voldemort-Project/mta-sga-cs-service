@@ -60,7 +60,7 @@ class GuestRepository:
 
     async def create_checkin(
         self,
-        room_ids: List[UUID],
+        room_id: UUID,
         checkin_date: date,
         checkin_time: time,
         org_id: UUID,
@@ -69,7 +69,7 @@ class GuestRepository:
         """Create a new check-in
 
         Args:
-            room_ids: List of room IDs for check-in
+            room_id: Room ID for check-in
             checkin_date: Check-in date
             checkin_time: Check-in time
             org_id: Organization ID
@@ -78,7 +78,7 @@ class GuestRepository:
         checkin = CheckinRoom(
             org_id=org_id,
             user_id=user_id,
-            room_id=room_ids,
+            room_id=room_id,
             checkin_date=checkin_date,
             checkin_time=checkin_time,
             status="active"
@@ -100,13 +100,18 @@ class GuestRepository:
     async def create_session(
         self,
         user_id: UUID,
-        checkin_room_id: UUID
+        checkin_room_id: UUID,
+        status=None,
+        mode=None
     ) -> Session:
         """Create a new chat session for guest"""
+        from app.models.session import SessionStatus, SessionMode
+
         session = Session(
             session_id=user_id,
             checkin_room_id=checkin_room_id,
-            is_active=True,
+            status=status or SessionStatus.open,
+            mode=mode or SessionMode.agent,
             start=datetime.utcnow()
         )
         self.db.add(session)
@@ -138,10 +143,12 @@ class GuestRepository:
 
     async def get_active_session_by_user_id(self, user_id: UUID) -> Optional[Session]:
         """Get active session for a user"""
+        from app.models.session import SessionStatus
         result = await self.db.execute(
             select(Session).where(
                 Session.session_id == user_id,
-                Session.is_active == True
+                Session.status == SessionStatus.open,
+                Session.deleted_at.is_(None)
             )
         )
         return result.scalar_one_or_none()
@@ -158,36 +165,36 @@ class GuestRepository:
 
     async def create_order(
         self,
-        checkin_id: UUID,
+        session_id: UUID,
+        guest_id: UUID,
         category: str,
-        title: str,
-        description: str,
         order_number: str,
         notes: Optional[str] = None,
         additional_notes: Optional[str] = None,
-        org_id: Optional[UUID] = None
+        org_id: Optional[UUID] = None,
+        total_amount: float = 0
     ) -> Order:
         """Create a new order
 
         Args:
-            checkin_id: Check-in room ID
-            category: Order category (housekeeping or restaurant)
-            title: Order title
-            description: Order description
+            session_id: Session ID
+            guest_id: Guest user ID
+            category: Order category (housekeeping, room_service, maintenance, concierge)
             order_number: Unique order number
             notes: Order notes (optional)
             additional_notes: Additional order notes (optional)
             org_id: Organization ID (optional)
+            total_amount: Total amount (optional, default: 0)
         """
         order = Order(
-            checkin_id=checkin_id,
+            session_id=session_id,
+            guest_id=guest_id,
             org_id=org_id,
             category=category,
-            title=title,
-            description=description,
             notes=notes,
             additional_notes=additional_notes,
-            order_number=order_number
+            order_number=order_number,
+            total_amount=total_amount
         )
         self.db.add(order)
         await self.db.flush()

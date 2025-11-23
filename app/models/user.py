@@ -30,3 +30,4 @@ class User(Base):
     division = relationship("Division", back_populates="users", foreign_keys=[division_id])
     role = relationship("Role", back_populates="users", foreign_keys=[role_id])
     sessions = relationship("Session", back_populates="user", foreign_keys="Session.session_id")
+    orders = relationship("Order", back_populates="guest", foreign_keys="Order.guest_id")

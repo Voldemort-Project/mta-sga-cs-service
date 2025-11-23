@@ -12,6 +12,7 @@ from app.models.checkin import CheckinRoom
 from app.models.session import Session
 from app.models.user import User
 from app.models.room import Room
+from app.models.order_item import OrderItem
 
 
 class OrderRepository:
@@ -24,10 +25,10 @@ class OrderRepository:
         """Get base query for orders with all relationships
 
         Query starts from orders table, then joins to:
-        - CheckinRoom (via checkin_id)
-        - Session (via checkin_room_id)
-        - User (via session_id, which is the guest user)
-        - Room (via room_id array in CheckinRoom)
+        - Session (via session_id)
+        - User (via guest_id, which is the guest user)
+        - CheckinRoom (via session.checkin_room_id)
+        - Room (via checkin_room.room_id)
 
         Args:
             org_id: Optional organization ID to filter orders
@@ -36,10 +37,12 @@ class OrderRepository:
             SQLAlchemy Select query for orders with relationships
         """
         # Start from orders table
-        # Use selectinload to eagerly load checkin relationship
+        # Use selectinload to eagerly load relationships
         query = (
             select(Order)
-            .options(selectinload(Order.checkin))
+            .options(
+                selectinload(Order.session).selectinload(Session.checkin_room)
+            )
             .where(Order.deleted_at.is_(None))
         )
 
@@ -102,3 +105,37 @@ class OrderRepository:
             )
         )
         return result.scalar_one_or_none()
+
+    async def get_room_by_id(self, room_id: UUID) -> Optional[Room]:
+        """Get room by ID
+
+        Args:
+            room_id: Room ID
+
+        Returns:
+            Room object or None
+        """
+        result = await self.db.execute(
+            select(Room).where(
+                Room.id == room_id,
+                Room.deleted_at.is_(None)
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def get_order_items_by_order_id(self, order_id: UUID) -> list[OrderItem]:
+        """Get order items by order ID
+
+        Args:
+            order_id: Order ID
+
+        Returns:
+            List of OrderItem objects
+        """
+        result = await self.db.execute(
+            select(OrderItem).where(
+                OrderItem.order_id == order_id,
+                OrderItem.deleted_at.is_(None)
+            )
+        )
+        return list(result.scalars().all())

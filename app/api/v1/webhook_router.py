@@ -92,10 +92,9 @@ async def order_webhook(
     It is separate from the WAHA webhook endpoint.
 
     Request body:
-    - session_id (required): Session ID to get checkin_id
-    - category (required): Order category ('housekeeping' or 'restaurant')
-    - title (required): Order title
-    - description (required): Order description
+    - session_id (required): Session ID
+    - category (required): Order category ('housekeeping', 'room_service', 'maintenance', or 'concierge')
+    - items (required): List of order items, each with title, description (optional), qty (optional), price (optional)
     - note (optional): Order note
     - additional_note (optional): Additional order note
     """
@@ -103,7 +102,7 @@ async def order_webhook(
         # Log the incoming webhook
         logger.info(
             f"Received order webhook: session_id={webhook_data.session_id}, "
-            f"category={webhook_data.category}, title={webhook_data.title}"
+            f"category={webhook_data.category}, items_count={len(webhook_data.items)}"
         )
 
         # Create order via service

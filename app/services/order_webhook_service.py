@@ -9,7 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.repositories.guest_repository import GuestRepository
-from app.models.checkin import CheckinRoom
+from app.models.session import Session
+from app.models.user import User
+from app.models.order_item import OrderItem
 from app.schemas.webhook import OrderWebhookRequest
 from app.core.exceptions import ComposeError
 from app.constants.error_codes import ErrorCode
@@ -58,45 +60,64 @@ class OrderWebhookService:
                 http_status_code=status.HTTP_404_NOT_FOUND
             )
 
-        # Get checkin_id from session
-        if not session.checkin_room_id:
+        # Get guest_id from session
+        if not session.session_id:
             raise ComposeError(
                 error_code=ErrorCode.General.BAD_REQUEST,
-                message=f"Session {request.session_id} does not have an associated check-in room",
+                message=f"Session {request.session_id} does not have an associated guest user",
                 http_status_code=status.HTTP_400_BAD_REQUEST
             )
 
-        checkin_id = session.checkin_room_id
+        guest_id = session.session_id
 
-        # Get org_id from checkin if available
-        checkin = await self.db.execute(
-            select(CheckinRoom).where(CheckinRoom.id == checkin_id)
+        # Get org_id from guest user if available
+        guest = await self.db.execute(
+            select(User).where(User.id == guest_id)
         )
-        checkin_obj = checkin.scalar_one_or_none()
-        org_id = checkin_obj.org_id if checkin_obj else None
+        guest_obj = guest.scalar_one_or_none()
+        org_id = guest_obj.org_id if guest_obj else None
 
         try:
             # Generate unique order number
             order_number = self._generate_order_number()
 
+            # Calculate total amount from items
+            total_amount = sum(
+                (item.price or 0) * (item.qty or 1)
+                for item in request.items
+            )
+
             # Create order
             order = await self.repository.create_order(
-                checkin_id=checkin_id,
+                session_id=request.session_id,
+                guest_id=guest_id,
                 category=request.category.value,
-                title=request.title,
-                description=request.description,
                 order_number=order_number,
                 notes=request.note,
                 additional_notes=request.additional_note,
-                org_id=org_id
+                org_id=org_id,
+                total_amount=total_amount
             )
+
+            # Create order items
+            for item_request in request.items:
+                order_item = OrderItem(
+                    order_id=order.id,
+                    title=item_request.title,
+                    description=item_request.description,
+                    qty=item_request.qty,
+                    price=item_request.price or 0,
+                    note=item_request.note
+                )
+                self.db.add(order_item)
 
             # Commit transaction
             await self.db.commit()
 
             logger.info(
                 f"Order created successfully: order_id={order.id}, "
-                f"order_number={order_number}, checkin_id={checkin_id}"
+                f"order_number={order_number}, session_id={request.session_id}, "
+                f"guest_id={guest_id}, items_count={len(request.items)}"
             )
 
             return order.id

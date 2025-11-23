@@ -11,9 +11,10 @@ from app.core.pagination import PaginationParams, paginate_query
 from app.core.exceptions import ComposeError
 from app.constants.error_codes import ErrorCode
 from app.repositories.order_repository import OrderRepository
-from app.schemas.order import OrderListItem, SessionItem, GuestItem, CheckinRoomItem, RoomItem
+from app.schemas.order import OrderListItem, SessionItem, GuestItem, CheckinRoomItem, RoomItem, OrderItemSchema
 from app.schemas.response import StandardResponse, create_paginated_response
 from app.models.order import Order
+from app.models.order_item import OrderItem
 
 logger = logging.getLogger(__name__)
 
@@ -53,30 +54,39 @@ class OrderService:
                 query=query,
                 params=params,
                 model=Order,
-                search_fields=["order_number", "title", "description", "category"]
+                search_fields=["order_number", "category"]
             )
 
             # Convert Order objects to OrderListItem with nested relationships
             order_items = []
             for order in result.data:
-                # Get checkin room if available
-                checkin_room = None
+                # Get order items
+                order_item_objs = await self.repository.get_order_items_by_order_id(order.id)
+                items = [
+                    OrderItemSchema(
+                        id=item.id,
+                        title=item.title,
+                        description=item.description,
+                        qty=item.qty,
+                        price=item.price,
+                        note=item.note
+                    )
+                    for item in order_item_objs
+                ]
+
+                # Get session if available
                 session = None
+                checkin_room = None
                 rooms = []
 
-                if order.checkin_id:
-                    # Get checkin room (already loaded via relationship)
-                    checkin_room_obj = order.checkin
-                    if checkin_room_obj:
-                        # Get session for this checkin room
-                        session_obj = await self.repository.get_session_by_checkin_room_id(
-                            checkin_room_obj.id
-                        )
-
-                        # Get guest user if session exists
+                if order.session_id:
+                    # Get session (already loaded via relationship)
+                    session_obj = order.session
+                    if session_obj:
+                        # Get guest user
                         guest = None
-                        if session_obj and session_obj.session_id:
-                            guest_obj = await self.repository.get_user_by_id(session_obj.session_id)
+                        if order.guest_id:
+                            guest_obj = await self.repository.get_user_by_id(order.guest_id)
                             if guest_obj:
                                 guest = GuestItem(
                                     id=guest_obj.id,
@@ -85,43 +95,45 @@ class OrderService:
                                     mobile_phone=guest_obj.mobile_phone
                                 )
 
-                        # Get rooms for this checkin
-                        if checkin_room_obj.room_id:
-                            room_objs = await self.repository.get_rooms_by_ids(
-                                list(checkin_room_obj.room_id)
-                            )
-                            rooms = [
-                                RoomItem(
-                                    id=room.id,
-                                    label=room.label,
-                                    room_number=room.room_number,
-                                    type=room.type,
-                                    is_booked=room.is_booked
-                                )
-                                for room in room_objs
-                            ]
-
                         # Build session item with guest nested inside
-                        if session_obj:
-                            session = SessionItem(
-                                id=session_obj.id,
-                                is_active=session_obj.is_active,
-                                start=session_obj.start,
-                                end=session_obj.end,
-                                duration=session_obj.duration,
-                                guest=guest
-                            )
-
-                        # Build checkin room item
-                        checkin_room = CheckinRoomItem(
-                            id=checkin_room_obj.id,
-                            checkin_date=checkin_room_obj.checkin_date,
-                            checkin_time=str(checkin_room_obj.checkin_time) if checkin_room_obj.checkin_time else None,
-                            checkout_date=checkin_room_obj.checkout_date,
-                            checkout_time=str(checkin_room_obj.checkout_time) if checkin_room_obj.checkout_time else None,
-                            status=checkin_room_obj.status,
-                            rooms=rooms
+                        session = SessionItem(
+                            id=session_obj.id,
+                            status=session_obj.status.value if session_obj.status else None,
+                            mode=session_obj.mode.value if session_obj.mode else None,
+                            start=session_obj.start,
+                            end=session_obj.end,
+                            duration=session_obj.duration,
+                            guest=guest
                         )
+
+                        # Get checkin room if available
+                        if session_obj.checkin_room_id:
+                            checkin_room_obj = session_obj.checkin_room
+                            if checkin_room_obj:
+                                # Get room for this checkin
+                                if checkin_room_obj.room_id:
+                                    room_obj = await self.repository.get_room_by_id(checkin_room_obj.room_id)
+                                    if room_obj:
+                                        rooms = [
+                                            RoomItem(
+                                                id=room_obj.id,
+                                                label=room_obj.label,
+                                                room_number=room_obj.room_number,
+                                                type=room_obj.type,
+                                                is_booked=room_obj.is_booked
+                                            )
+                                        ]
+
+                                # Build checkin room item
+                                checkin_room = CheckinRoomItem(
+                                    id=checkin_room_obj.id,
+                                    checkin_date=checkin_room_obj.checkin_date,
+                                    checkin_time=str(checkin_room_obj.checkin_time) if checkin_room_obj.checkin_time else None,
+                                    checkout_date=checkin_room_obj.checkout_date,
+                                    checkout_time=str(checkin_room_obj.checkout_time) if checkin_room_obj.checkout_time else None,
+                                    status=checkin_room_obj.status,
+                                    rooms=rooms
+                                )
 
                 # Extract order_date from created_at
                 order_date = order.created_at.date() if order.created_at else None
@@ -132,11 +144,11 @@ class OrderService:
                     order_number=order.order_number,
                     order_date=order_date,
                     order_status=order.status,
-                    category=order.category,
-                    title=order.title,
-                    description=order.description,
+                    category=order.category.value if hasattr(order.category, 'value') else order.category,
                     note=order.notes,
                     additional_note=order.additional_notes,
+                    total_amount=order.total_amount,
+                    items=items,
                     session=session,
                     checkin_rooms=checkin_room,
                     created_at=order.created_at,

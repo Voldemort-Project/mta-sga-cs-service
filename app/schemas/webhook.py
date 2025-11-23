@@ -93,15 +93,25 @@ class WahaWebhookResponse(BaseModel):
 class OrderCategory(str, Enum):
     """Order category enum"""
     housekeeping = "housekeeping"
-    restaurant = "restaurant"
+    room_service = "room_service"
+    maintenance = "maintenance"
+    concierge = "concierge"
+
+
+class OrderItemRequest(BaseModel):
+    """Request schema for order item"""
+    title: str = Field(..., description="Order item title (required)")
+    description: Optional[str] = Field(None, description="Order item description (optional)")
+    qty: Optional[int] = Field(None, description="Quantity (optional)")
+    price: Optional[float] = Field(0, description="Price (optional, default: 0)")
+    note: Optional[str] = Field(None, description="Order item note (optional)")
 
 
 class OrderWebhookRequest(BaseModel):
     """Request schema for order webhook"""
     session_id: UUID = Field(..., description="Session ID (required)")
-    category: OrderCategory = Field(..., description="Order category: 'housekeeping' or 'restaurant' (required)")
-    title: str = Field(..., description="Order title (required)")
-    description: str = Field(..., description="Order description (required)")
+    category: OrderCategory = Field(..., description="Order category: 'housekeeping', 'room_service', 'maintenance', or 'concierge' (required)")
+    items: List[OrderItemRequest] = Field(..., description="List of order items (required)")
     note: Optional[str] = Field(None, description="Order note (optional, nullable)")
     additional_note: Optional[str] = Field(None, description="Order additional note (optional, nullable)")
 
