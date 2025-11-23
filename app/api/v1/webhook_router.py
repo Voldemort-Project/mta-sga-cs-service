@@ -88,33 +88,34 @@ async def order_webhook(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Webhook endpoint to receive order creation requests.
+    Webhook endpoint to receive order creation requests (supports bulk insert).
 
-    This endpoint receives order data and creates an order in the system.
+    This endpoint receives order data and creates one or more orders in the system.
     It is separate from the WAHA webhook endpoint.
 
     Request body:
     - session_id (required): Session ID
-    - category (required): Order category ('housekeeping', 'room_service', 'maintenance', or 'concierge')
-    - items (required): List of order items, each with title, description (optional), qty (optional), price (optional)
-    - note (optional): Order note
-    - additional_note (optional): Additional order note
+    - orders (required): List of orders, each with:
+      - category (required): Order category ('housekeeping', 'room_service', 'maintenance', or 'concierge')
+      - items (required): List of order items, each with title, description (optional), qty (optional), price (optional)
+      - note (optional): Order note
+      - additional_note (optional): Additional order note
     """
     try:
         # Log the incoming webhook
         logger.info(
             f"Received order webhook: session_id={webhook_data.session_id}, "
-            f"category={webhook_data.category}, items_count={len(webhook_data.items)}"
+            f"orders_count={len(webhook_data.orders)}"
         )
 
-        # Create order via service
+        # Create orders via service
         order_service = OrderWebhookService(db)
-        order_id = await order_service.create_order_from_webhook(webhook_data)
+        order_numbers = await order_service.create_order_from_webhook(webhook_data)
 
         return OrderWebhookResponse(
             status="success",
-            message="Order created successfully",
-            order_id=order_id
+            message=f"{len(order_numbers)} order(s) created successfully",
+            order_numbers=order_numbers
         )
 
     except ComposeError:

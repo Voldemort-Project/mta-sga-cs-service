@@ -3,7 +3,7 @@ import logging
 import uuid
 from datetime import datetime
 from uuid import UUID
-from typing import Optional
+from typing import Optional, List
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -12,7 +12,7 @@ from app.repositories.guest_repository import GuestRepository
 from app.models.session import Session
 from app.models.user import User
 from app.models.order_item import OrderItem
-from app.schemas.webhook import OrderWebhookRequest
+from app.schemas.webhook import OrderWebhookRequest, OrderRequest
 from app.core.exceptions import ComposeError
 from app.constants.error_codes import ErrorCode
 from fastapi import status
@@ -38,15 +38,15 @@ class OrderWebhookService:
         short_uuid = str(uuid.uuid4())[:8].upper()
         return f"ORD-{timestamp}-{short_uuid}"
 
-    async def create_order_from_webhook(self, request: OrderWebhookRequest) -> UUID:
+    async def create_order_from_webhook(self, request: OrderWebhookRequest) -> List[str]:
         """
-        Create an order from webhook request.
+        Create orders from webhook request (supports bulk insert).
 
         Args:
-            request: Order webhook request data
+            request: Order webhook request data with multiple orders
 
         Returns:
-            Created order ID
+            List of created order numbers
 
         Raises:
             ComposeError: If session not found or order creation fails
@@ -78,59 +78,70 @@ class OrderWebhookService:
         org_id = guest_obj.org_id if guest_obj else None
 
         try:
-            # Generate unique order number
-            order_number = self._generate_order_number()
+            created_order_numbers = []
 
-            # Calculate total amount from items
-            total_amount = sum(
-                (item.price or 0) * (item.qty or 1)
-                for item in request.items
-            )
+            # Process each order in the request
+            for order_request in request.orders:
+                # Generate unique order number
+                order_number = self._generate_order_number()
 
-            # Create order
-            order = await self.repository.create_order(
-                session_id=request.session_id,
-                guest_id=guest_id,
-                category=request.category.value,
-                order_number=order_number,
-                notes=request.note,
-                additional_notes=request.additional_note,
-                org_id=org_id,
-                total_amount=total_amount
-            )
-
-            # Create order items
-            for item_request in request.items:
-                order_item = OrderItem(
-                    order_id=order.id,
-                    title=item_request.title,
-                    description=item_request.description,
-                    qty=item_request.qty,
-                    price=item_request.price or 0,
-                    note=item_request.note
+                # Calculate total amount from items
+                total_amount = sum(
+                    (item.price or 0) * (item.qty or 1)
+                    for item in order_request.items
                 )
-                self.db.add(order_item)
 
-            # Commit transaction
+                # Create order
+                order = await self.repository.create_order(
+                    session_id=request.session_id,
+                    guest_id=guest_id,
+                    category=order_request.category.value,
+                    order_number=order_number,
+                    notes=order_request.note,
+                    additional_notes=order_request.additional_note,
+                    org_id=org_id,
+                    total_amount=total_amount
+                )
+
+                # Create order items
+                for item_request in order_request.items:
+                    order_item = OrderItem(
+                        order_id=order.id,
+                        title=item_request.title,
+                        description=item_request.description,
+                        qty=item_request.qty,
+                        price=item_request.price or 0,
+                        note=item_request.note
+                    )
+                    self.db.add(order_item)
+
+                created_order_numbers.append(order_number)
+
+                logger.info(
+                    f"Order created successfully: order_id={order.id}, "
+                    f"order_number={order_number}, session_id={request.session_id}, "
+                    f"guest_id={guest_id}, items_count={len(order_request.items)}"
+                )
+
+            # Commit transaction for all orders
             await self.db.commit()
 
             logger.info(
-                f"Order created successfully: order_id={order.id}, "
-                f"order_number={order_number}, session_id={request.session_id}, "
-                f"guest_id={guest_id}, items_count={len(request.items)}"
+                f"Bulk order creation completed: session_id={request.session_id}, "
+                f"orders_count={len(created_order_numbers)}, order_numbers={created_order_numbers}"
             )
 
-            return order.id
+            return created_order_numbers
 
         except Exception as e:
             await self.db.rollback()
             logger.error(
-                f"Error creating order for session {request.session_id}: {str(e)}",
+                f"Error creating orders for session {request.session_id}: {str(e)}",
                 exc_info=True
             )
             raise ComposeError(
                 error_code=ErrorCode.General.INTERNAL_SERVER_ERROR,
-                message=f"Failed to create order: {str(e)}",
+                message=f"Failed to create orders: {str(e)}",
                 http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 original_error=e
             )

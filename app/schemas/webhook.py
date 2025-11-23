@@ -107,20 +107,25 @@ class OrderItemRequest(BaseModel):
     note: Optional[str] = Field(None, description="Order item note (optional)")
 
 
-class OrderWebhookRequest(BaseModel):
-    """Request schema for order webhook"""
-    session_id: UUID = Field(..., description="Session ID (required)")
+class OrderRequest(BaseModel):
+    """Request schema for a single order in bulk order webhook"""
     category: OrderCategory = Field(..., description="Order category: 'housekeeping', 'room_service', 'maintenance', or 'concierge' (required)")
     items: List[OrderItemRequest] = Field(..., description="List of order items (required)")
     note: Optional[str] = Field(None, description="Order note (optional, nullable)")
     additional_note: Optional[str] = Field(None, description="Order additional note (optional, nullable)")
 
 
+class OrderWebhookRequest(BaseModel):
+    """Request schema for order webhook (supports bulk orders)"""
+    session_id: UUID = Field(..., description="Session ID (required)")
+    orders: List[OrderRequest] = Field(..., description="List of orders to create (required)")
+
+
 class OrderWebhookResponse(BaseModel):
     """Response schema for order webhook"""
     status: str
     message: str
-    order_id: Optional[UUID] = None
+    order_numbers: List[str] = Field(default_factory=list, description="List of created order numbers")
 
 
 class SendMessageRequest(BaseModel):
