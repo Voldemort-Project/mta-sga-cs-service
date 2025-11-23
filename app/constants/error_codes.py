@@ -53,14 +53,28 @@ class ErrorCode:
         REGISTRATION_FAILED = "5_000_001_0000002"
 
     # ============================================
+    # Order Service Errors (002)
+    # ============================================
+    class Order:
+        """Order service related errors"""
+        # Not Found (404)
+        ORDER_NOT_FOUND = "4_000_002_0000001"
+
+        # Bad Request (400)
+        INVALID_PAGINATION_PARAMS = "4_000_002_0000002"
+
+        # Internal Server Error (500)
+        LIST_ORDERS_FAILED = "5_000_002_0000001"
+
+    # ============================================
     # Add more categories below as needed
     # ============================================
     # class Room:
     #     """Room service related errors"""
-    #     NOT_FOUND = "4_000_002_0000001"
+    #     NOT_FOUND = "4_000_003_0000001"
     #     ...
     #
     # class User:
     #     """User service related errors"""
-    #     NOT_FOUND = "4_000_003_0000001"
+    #     NOT_FOUND = "4_000_004_0000001"
     #     ...

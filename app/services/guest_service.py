@@ -7,7 +7,7 @@ import logging
 from fastapi import status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.pagination import PaginationParams, PaginatedResponse, paginate_query
+from app.core.pagination import PaginationParams, paginate_query
 from app.core.exceptions import ComposeError
 from app.constants.error_codes import ErrorCode
 from app.repositories.guest_repository import GuestRepository

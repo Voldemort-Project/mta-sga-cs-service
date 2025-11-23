@@ -86,7 +86,7 @@ async def compose_error_handler(request: Request, exc: ComposeError) -> JSONResp
 
     return JSONResponse(
         status_code=exc.http_status_code,
-        content=error_response.model_dump(exclude_none=True)
+        content=error_response.model_dump(mode='json', exclude_none=True)
     )
 
 
@@ -117,7 +117,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
 
     return JSONResponse(
         status_code=exc.status_code,
-        content=error_response.model_dump(exclude_none=True)
+        content=error_response.model_dump(mode='json', exclude_none=True)
     )
 
 
@@ -165,7 +165,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content=error_response.model_dump(exclude_none=True)
+        content=error_response.model_dump(mode='json', exclude_none=True)
     )
 
 
@@ -205,5 +205,5 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
 
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content=error_response.model_dump(exclude_none=True)
+        content=error_response.model_dump(mode='json', exclude_none=True)
     )
