@@ -11,9 +11,9 @@ from app.core.pagination import PaginationParams, paginate_query
 from app.core.exceptions import ComposeError
 from app.constants.error_codes import ErrorCode
 from app.repositories.order_repository import OrderRepository
-from app.schemas.order import OrderListItem, SessionItem, GuestItem, CheckinRoomItem, RoomItem, OrderItemSchema
-from app.schemas.response import StandardResponse, create_paginated_response
-from app.models.order import Order
+from app.schemas.order import OrderListItem, SessionItem, GuestItem, CheckinRoomItem, RoomItem, OrderItemSchema, UpdateOrderStatusResponse
+from app.schemas.response import StandardResponse, create_paginated_response, create_success_response
+from app.models.order import Order, OrderStatus
 from app.models.order_item import OrderItem
 
 logger = logging.getLogger(__name__)
@@ -172,6 +172,68 @@ class OrderService:
             raise ComposeError(
                 error_code=ErrorCode.Order.LIST_ORDERS_FAILED,
                 message="Failed to retrieve orders. Please try again or contact support.",
+                http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                original_error=e
+            )
+
+    async def update_order_status(
+        self,
+        order_id: UUID,
+        new_status: OrderStatus
+    ) -> StandardResponse[UpdateOrderStatusResponse]:
+        """
+        Update order status
+
+        Args:
+            order_id: Order ID to update
+            new_status: New order status
+
+        Returns:
+            StandardResponse[UpdateOrderStatusResponse]: Standard response with updated order information
+
+        Raises:
+            ComposeError: If order not found or update fails
+        """
+        try:
+            # Get order by ID
+            order = await self.repository.get_order_by_id(order_id)
+            if not order:
+                raise ComposeError(
+                    error_code=ErrorCode.Order.ORDER_NOT_FOUND,
+                    message=f"Order with ID {order_id} not found.",
+                    http_status_code=status.HTTP_404_NOT_FOUND
+                )
+
+            # Update order status
+            updated_order = await self.repository.update_order_status(order_id, new_status)
+            if not updated_order:
+                raise ComposeError(
+                    error_code=ErrorCode.Order.UPDATE_STATUS_FAILED,
+                    message="Failed to update order status. Please try again or contact support.",
+                    http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+            # Build response
+            response_data = UpdateOrderStatusResponse(
+                id=updated_order.id,
+                order_number=updated_order.order_number,
+                status=updated_order.status,
+                updated_at=updated_order.updated_at
+            )
+
+            return create_success_response(
+                data=response_data,
+                message="Order status updated successfully"
+            )
+
+        except ComposeError:
+            # Re-raise ComposeError as-is
+            raise
+        except Exception as e:
+            logger.error(f"Error updating order status: {str(e)}", exc_info=True)
+            raise ComposeError(
+                error_code=ErrorCode.Order.UPDATE_STATUS_FAILED,
+                message="Failed to update order status. Please try again or contact support.",
                 http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 original_error=e
             )

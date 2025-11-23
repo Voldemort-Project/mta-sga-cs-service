@@ -62,9 +62,11 @@ class ErrorCode:
 
         # Bad Request (400)
         INVALID_PAGINATION_PARAMS = "4_000_002_0000002"
+        INVALID_STATUS = "4_000_002_0000003"
 
         # Internal Server Error (500)
         LIST_ORDERS_FAILED = "5_000_002_0000001"
+        UPDATE_STATUS_FAILED = "5_000_002_0000002"
 
     # ============================================
     # Order Assigner Service Errors (004)

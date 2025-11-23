@@ -139,3 +139,37 @@ class OrderRepository:
             )
         )
         return list(result.scalars().all())
+
+    async def get_order_by_id(self, order_id: UUID) -> Optional[Order]:
+        """Get order by ID
+
+        Args:
+            order_id: Order ID
+
+        Returns:
+            Order object or None
+        """
+        result = await self.db.execute(
+            select(Order).where(
+                Order.id == order_id,
+                Order.deleted_at.is_(None)
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def update_order_status(self, order_id: UUID, status) -> Optional[Order]:
+        """Update order status
+
+        Args:
+            order_id: Order ID
+            status: New order status (OrderStatus enum)
+
+        Returns:
+            Updated Order object or None if order not found
+        """
+        order = await self.get_order_by_id(order_id)
+        if order:
+            order.status = status
+            await self.db.commit()
+            await self.db.refresh(order)
+        return order

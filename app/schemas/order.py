@@ -191,3 +191,36 @@ class OrderAssignerResponse(BaseModel):
             }
         }
     }
+
+
+class UpdateOrderStatusRequest(BaseModel):
+    """Schema for updating order status"""
+    status: OrderStatus = Field(..., description="New order status")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "status": "in_progress"
+            }
+        }
+    }
+
+
+class UpdateOrderStatusResponse(BaseModel):
+    """Schema for order status update response"""
+    id: UUID = Field(..., description="Order ID")
+    order_number: str = Field(..., description="Order number")
+    status: OrderStatus = Field(..., description="Updated order status")
+    updated_at: datetime = Field(..., description="Last update timestamp")
+
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {
+            "example": {
+                "id": "123e4567-e89b-12d3-a456-426614174000",
+                "order_number": "1234567890",
+                "status": "in_progress",
+                "updated_at": "2025-01-01T10:00:00Z"
+            }
+        }
+    }

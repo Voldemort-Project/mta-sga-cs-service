@@ -8,7 +8,7 @@ from app.core.database import get_db
 from app.core.pagination import PaginationParams
 from app.core.security import get_current_user
 from app.schemas.auth import TokenData
-from app.schemas.order import OrderListItem, AssignOrderRequest, OrderAssignerResponse
+from app.schemas.order import OrderListItem, AssignOrderRequest, OrderAssignerResponse, UpdateOrderStatusRequest, UpdateOrderStatusResponse
 from app.schemas.response import StandardResponse
 from app.services.order_service import OrderService
 from app.services.order_assigner_service import OrderAssignerService
@@ -121,4 +121,47 @@ async def assign_order_to_worker(
     return await service.assign_order_to_worker(
         order_id=order_id,
         worker_id=request.worker_id
+    )
+
+
+@router.patch(
+    "/{order_id}/status",
+    response_model=StandardResponse[UpdateOrderStatusResponse],
+    status_code=status.HTTP_200_OK,
+    summary="Update Order Status",
+    description="Update the status of an order"
+)
+async def update_order_status(
+    order_id: uuid.UUID = Path(..., description="Order ID to update"),
+    request: UpdateOrderStatusRequest = ...,
+    current_user: TokenData = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+) -> StandardResponse[UpdateOrderStatusResponse]:
+    """
+    Update the status of an order.
+
+    This endpoint will:
+    - Validate that the order exists
+    - Update the order status to the new status
+    - Return the updated order information
+
+    Args:
+        order_id: Order ID to update
+        request: Request body containing the new status
+        current_user: Current authenticated user (from token)
+        db: Database session dependency
+
+    Returns:
+        StandardResponse[UpdateOrderStatusResponse]: Updated order information
+
+    Raises:
+        404: Order not found
+        400: Invalid status
+        401: Unauthorized (if token is invalid)
+        500: Internal server error
+    """
+    service = OrderService(db)
+    return await service.update_order_status(
+        order_id=order_id,
+        new_status=request.status
     )
