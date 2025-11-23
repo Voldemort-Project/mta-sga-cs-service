@@ -7,6 +7,7 @@ from app.models.room import Room
 from app.models.checkin import CheckinRoom
 from app.models.order import Order, OrderStatus, OrderCategory
 from app.models.order_item import OrderItem
+from app.models.order_assigner import OrderAssigner, OrderAssignerStatus
 from app.models.session import Session, SessionStatus, SessionMode
 from app.models.message import Message, MessageRole
 
@@ -21,6 +22,8 @@ __all__ = [
     "OrderStatus",
     "OrderCategory",
     "OrderItem",
+    "OrderAssigner",
+    "OrderAssignerStatus",
     "Session",
     "SessionStatus",
     "SessionMode",

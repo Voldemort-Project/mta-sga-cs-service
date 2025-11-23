@@ -67,6 +67,22 @@ class ErrorCode:
         LIST_ORDERS_FAILED = "5_000_002_0000001"
 
     # ============================================
+    # Order Assigner Service Errors (004)
+    # ============================================
+    class OrderAssigner:
+        """Order assigner service related errors"""
+        # Not Found (404)
+        ORDER_NOT_FOUND = "4_000_004_0000001"
+        WORKER_NOT_FOUND = "4_000_004_0000002"
+
+        # Bad Request (400)
+        ORDER_ALREADY_ASSIGNED = "4_000_004_0000003"
+        WORKER_MAX_ORDERS_REACHED = "4_000_004_0000004"
+
+        # Internal Server Error (500)
+        ASSIGNMENT_FAILED = "5_000_004_0000001"
+
+    # ============================================
     # H2H Integration Errors (003)
     # ============================================
     class H2H:

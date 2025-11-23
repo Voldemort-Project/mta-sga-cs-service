@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from app.models.order import OrderStatus
 from app.models.order_item import OrderItem
+from app.models.order_assigner import OrderAssignerStatus
 
 
 class RoomItem(BaseModel):
@@ -146,6 +147,45 @@ class OrderListItem(BaseModel):
                         }
                     ]
                 },
+                "created_at": "2025-01-01T10:00:00Z",
+                "updated_at": "2025-01-01T10:00:00Z"
+            }
+        }
+    }
+
+
+class AssignOrderRequest(BaseModel):
+    """Schema for assigning order to worker"""
+    worker_id: UUID = Field(..., description="Worker (user) ID to assign the order to")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "worker_id": "123e4567-e89b-12d3-a456-426614174000"
+            }
+        }
+    }
+
+
+class OrderAssignerResponse(BaseModel):
+    """Schema for order assigner response"""
+    id: UUID = Field(..., description="Order assigner ID")
+    order_id: UUID = Field(..., description="Order ID")
+    worker_id: UUID = Field(..., description="Worker (user) ID")
+    assigned_at: datetime = Field(..., description="Assignment timestamp")
+    status: OrderAssignerStatus = Field(..., description="Assignment status")
+    created_at: datetime = Field(..., description="Creation timestamp")
+    updated_at: datetime = Field(..., description="Last update timestamp")
+
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {
+            "example": {
+                "id": "123e4567-e89b-12d3-a456-426614174000",
+                "order_id": "123e4567-e89b-12d3-a456-426614174001",
+                "worker_id": "123e4567-e89b-12d3-a456-426614174002",
+                "assigned_at": "2025-01-01T10:00:00Z",
+                "status": "assigned",
                 "created_at": "2025-01-01T10:00:00Z",
                 "updated_at": "2025-01-01T10:00:00Z"
             }

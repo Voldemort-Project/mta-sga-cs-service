@@ -1,16 +1,17 @@
 """Order router"""
 import uuid
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, status, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.pagination import PaginationParams
 from app.core.security import get_current_user
 from app.schemas.auth import TokenData
-from app.schemas.order import OrderListItem
+from app.schemas.order import OrderListItem, AssignOrderRequest, OrderAssignerResponse
 from app.schemas.response import StandardResponse
 from app.services.order_service import OrderService
+from app.services.order_assigner_service import OrderAssignerService
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -70,3 +71,54 @@ async def list_orders(
 
     service = OrderService(db)
     return await service.list_orders(org_id=org_id, params=params)
+
+
+@router.post(
+    "/{order_id}/assign-worker",
+    response_model=StandardResponse[OrderAssignerResponse],
+    status_code=status.HTTP_201_CREATED,
+    summary="Assign Order to Worker",
+    description="Assign an order to a worker. Worker can only handle maximum 5 active orders at a time."
+)
+async def assign_order_to_worker(
+    order_id: uuid.UUID = Path(..., description="Order ID to assign"),
+    request: AssignOrderRequest = ...,
+    current_user: TokenData = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+) -> StandardResponse[OrderAssignerResponse]:
+    """
+    Assign an order to a worker.
+
+    This endpoint will:
+    - Validate that the order exists
+    - Validate that the worker exists
+    - Check if worker has reached the maximum limit of 5 active orders
+    - Check if order is already assigned to this worker
+    - Create the assignment and update order status to "assigned"
+
+    Business Rules:
+    - Worker can only handle maximum 5 active orders at a time
+      (active = assigned, pick_up, or in_progress status)
+    - Order cannot be assigned to the same worker twice
+    - Order status will be updated to "assigned" if it's currently "pending"
+
+    Args:
+        order_id: Order ID to assign
+        request: Request body containing worker_id
+        current_user: Current authenticated user (from token)
+        db: Database session dependency
+
+    Returns:
+        StandardResponse[OrderAssignerResponse]: Created assignment information
+
+    Raises:
+        400: Bad request (worker max orders reached, order already assigned)
+        404: Order or worker not found
+        401: Unauthorized (if token is invalid)
+        500: Internal server error
+    """
+    service = OrderAssignerService(db)
+    return await service.assign_order_to_worker(
+        order_id=order_id,
+        worker_id=request.worker_id
+    )

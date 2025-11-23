@@ -53,3 +53,4 @@ class Order(Base):
     guest = relationship("User", back_populates="orders", foreign_keys=[guest_id])
     organization = relationship("Organization", back_populates="orders", foreign_keys=[org_id])
     order_items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+    order_assigners = relationship("OrderAssigner", back_populates="order", foreign_keys="OrderAssigner.order_id")
