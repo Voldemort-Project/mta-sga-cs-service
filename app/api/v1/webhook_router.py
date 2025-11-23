@@ -1,11 +1,8 @@
 from fastapi import APIRouter, Request, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from sqlalchemy.orm import joinedload
 
 from app.core.database import get_db
 from app.core.exceptions import ComposeError
-from app.constants.error_codes import ErrorCode
 from app.schemas.webhook import (
     WahaWebhookRequest,
     WahaWebhookResponse,
@@ -14,11 +11,8 @@ from app.schemas.webhook import (
     SendMessageRequest
 )
 from app.schemas.response import StandardResponse, create_success_response
-from app.models.session import Session
-from app.models.user import User
 from app.services.webhook_service import WebhookService
 from app.services.order_webhook_service import OrderWebhookService
-from app.integrations.waha.waha_service import WahaService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -143,6 +137,8 @@ async def send_message(
 
     This endpoint receives a session_id and message, retrieves the user's
     mobile phone number from the session, and sends the message via WAHA.
+    The message is recorded in the database as a System message if the
+    session mode is 'agent' and status is not 'terminated'.
 
     Request body:
     - session_id (required): Session ID
@@ -155,48 +151,11 @@ async def send_message(
             f"message_length={len(webhook_data.message)}"
         )
 
-        # Get session with joined user to get mobile_phone
-        result = await db.execute(
-            select(Session)
-            .options(joinedload(Session.user))
-            .where(
-                Session.id == webhook_data.session_id,
-                Session.deleted_at.is_(None)
-            )
-        )
-        session = result.scalar_one_or_none()
-
-        if not session:
-            raise ComposeError(
-                error_code=ErrorCode.General.NOT_FOUND,
-                message=f"Session {webhook_data.session_id} not found",
-                http_status_code=404
-            )
-
-        if not session.user:
-            raise ComposeError(
-                error_code=ErrorCode.General.NOT_FOUND,
-                message=f"User not found for session {webhook_data.session_id}",
-                http_status_code=404
-            )
-
-        if not session.user.mobile_phone:
-            raise ComposeError(
-                error_code=ErrorCode.General.BAD_REQUEST,
-                message=f"User {session.user.id} does not have a mobile phone number",
-                http_status_code=400
-            )
-
-        # Send message via WAHA
-        waha_service = WahaService()
-        await waha_service.send_text_message(
-            phone_number=session.user.mobile_phone,
-            text=webhook_data.message
-        )
-
-        logger.info(
-            f"Message sent successfully to {session.user.mobile_phone} "
-            f"for session {webhook_data.session_id}"
+        # Use webhook service to handle the business logic
+        webhook_service = WebhookService(db)
+        await webhook_service.send_message(
+            session_id=webhook_data.session_id,
+            message=webhook_data.message
         )
 
         return create_success_response(

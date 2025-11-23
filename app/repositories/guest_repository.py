@@ -163,6 +163,19 @@ class GuestRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_session_with_user(self, session_id: UUID) -> Optional[Session]:
+        """Get session by session ID with user relationship loaded"""
+        from sqlalchemy.orm import joinedload
+        result = await self.db.execute(
+            select(Session)
+            .options(joinedload(Session.user))
+            .where(
+                Session.id == session_id,
+                Session.deleted_at.is_(None)
+            )
+        )
+        return result.scalar_one_or_none()
+
     async def create_order(
         self,
         session_id: UUID,
