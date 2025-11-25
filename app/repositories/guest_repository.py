@@ -173,6 +173,16 @@ class GuestRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_checkin_room_by_id(self, checkin_room_id: UUID) -> Optional[CheckinRoom]:
+        """Get checkin room by ID"""
+        result = await self.db.execute(
+            select(CheckinRoom).where(
+                CheckinRoom.id == checkin_room_id,
+                CheckinRoom.deleted_at.is_(None)
+            )
+        )
+        return result.scalar_one_or_none()
+
     async def get_session_with_user(self, session_id: UUID) -> Optional[Session]:
         """Get session by session ID with user relationship loaded"""
         from sqlalchemy.orm import joinedload

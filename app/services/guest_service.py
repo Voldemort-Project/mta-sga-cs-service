@@ -107,28 +107,28 @@ class GuestService:
             )
 
             # Create welcome message and save to database
-            welcome_text = (
-                f"Halo {user.name}! 👋\n\n"
-                f"Selamat datang di hotel kami. Anda telah berhasil check-in di kamar {room.room_number}.\n\n"
-                f"Jika Anda membutuhkan bantuan atau memiliki pertanyaan, "
-                f"silakan balas pesan ini dan kami akan segera membantu Anda.\n\n"
-                f"Terima kasih telah memilih hotel kami. Semoga Anda menikmati masa menginap Anda! 🏨"
-            )
+            # welcome_text = (
+            #     f"Halo {user.name}! 👋\n\n"
+            #     f"Selamat datang di hotel kami. Anda telah berhasil check-in di kamar {room.room_number}.\n\n"
+            #     f"Jika Anda membutuhkan bantuan atau memiliki pertanyaan, "
+            #     f"silakan balas pesan ini dan kami akan segera membantu Anda.\n\n"
+            #     f"Terima kasih telah memilih hotel kami. Semoga Anda menikmati masa menginap Anda! 🏨"
+            # )
 
-            await self.repository.create_message(
-                session_id=session.id,
-                role=MessageRole.System,
-                text=welcome_text
-            )
+            # await self.repository.create_message(
+            #     session_id=session.id,
+            #     role=MessageRole.System,
+            #     text=welcome_text
+            # )
 
             # Send welcome message via WAHA (must succeed before commit)
             # This is part of the atomic transaction - if this fails, everything rolls back
-            logger.info(f"Sending welcome message to guest {user.name} at {user.mobile_phone}")
-            await self.waha_service.send_text_message(
-                phone_number=user.mobile_phone,
-                text=welcome_text
-            )
-            logger.info(f"Welcome message sent successfully to {user.mobile_phone}")
+            # logger.info(f"Sending welcome message to guest {user.name} at {user.mobile_phone}")
+            # await self.waha_service.send_text_message(
+            #     phone_number=user.mobile_phone,
+            #     text=welcome_text
+            # )
+            # logger.info(f"Welcome message sent successfully to {user.mobile_phone}")
 
             # Commit transaction (only if everything above succeeded)
             await self.db.commit()
@@ -267,6 +267,13 @@ class GuestService:
                     message=f"Failed to terminate session {session.id}",
                     http_status_code=status.HTTP_404_NOT_FOUND
                 )
+
+            # Get checkin room to find the room_id
+            checkin_room = await self.repository.get_checkin_room_by_id(session.checkin_room_id)
+            if checkin_room and checkin_room.room_id:
+                # Update room status to not booked
+                await self.repository.update_room_booked_status(checkin_room.room_id, False)
+                logger.info(f"Room {checkin_room.room_id} status updated to not booked for guest {guest_id}")
 
             # Commit transaction
             await self.db.commit()
