@@ -21,7 +21,7 @@ class OrderRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    def get_orders_query(self, org_id: Optional[UUID] = None) -> Select:
+    def get_orders_query(self, org_id: Optional[UUID] = None, category: Optional = None) -> Select:
         """Get base query for orders with all relationships
 
         Query starts from orders table, then joins to:
@@ -29,9 +29,12 @@ class OrderRepository:
         - User (via guest_id, which is the guest user)
         - CheckinRoom (via session.checkin_room_id)
         - Room (via checkin_room.room_id)
+        - OrderItems (via order_id)
+        - Organization (via org_id)
 
         Args:
             org_id: Optional organization ID to filter orders
+            category: Optional order category to filter by
 
         Returns:
             SQLAlchemy Select query for orders with relationships
@@ -41,7 +44,10 @@ class OrderRepository:
         query = (
             select(Order)
             .options(
-                selectinload(Order.session).selectinload(Session.checkin_room)
+                selectinload(Order.session).selectinload(Session.checkin_room),
+                selectinload(Order.guest),
+                selectinload(Order.organization),
+                selectinload(Order.order_items)
             )
             .where(Order.deleted_at.is_(None))
         )
@@ -49,6 +55,10 @@ class OrderRepository:
         # Filter by organization if provided
         if org_id:
             query = query.where(Order.org_id == org_id)
+
+        # Filter by category if provided
+        if category:
+            query = query.where(Order.category == category)
 
         return query
 

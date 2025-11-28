@@ -12,6 +12,7 @@ from app.schemas.order import OrderListItem, AssignOrderRequest, OrderAssignerRe
 from app.schemas.response import StandardResponse
 from app.services.order_service import OrderService
 from app.services.order_assigner_service import OrderAssignerService
+from app.models.order import OrderCategory
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -28,6 +29,7 @@ async def list_orders(
     per_page: int = Query(10, ge=1, le=100, description="Items per page"),
     keyword: Optional[str] = Query(None, description="Search keyword (searches in order_number, category)"),
     order: Optional[str] = Query(None, description="Order string (e.g., 'created_at:desc;order_number:asc')"),
+    category: Optional[OrderCategory] = Query(None, description="Filter by order category (housekeeping, room_service, maintenance, concierge)"),
     current_user: TokenData = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> StandardResponse[List[OrderListItem]]:
@@ -36,8 +38,8 @@ async def list_orders(
 
     This endpoint will:
     - Filter orders by the organization of the currently logged-in user
-    - Support pagination, search, and ordering
-    - Return orders with nested relationships (Session, Guest, CheckinRoom, Room)
+    - Support pagination, search, ordering, and filtering by category
+    - Return orders with nested relationships (Session, Guest, CheckinRoom, Room, OrderItems)
 
     Args:
         page: Page number (starts from 1)
@@ -45,6 +47,7 @@ async def list_orders(
         keyword: Optional search keyword to filter by order_number or category
         order: Optional order string in format "field:direction;field2:direction2"
                e.g., "created_at:desc;order_number:asc"
+        category: Optional filter by order category (housekeeping, room_service, maintenance, concierge)
         current_user: Current authenticated user (from token)
         db: Database session dependency
 
@@ -70,7 +73,7 @@ async def list_orders(
     )
 
     service = OrderService(db)
-    return await service.list_orders(org_id=org_id, params=params)
+    return await service.list_orders(org_id=org_id, params=params, category=category)
 
 
 @router.post(
@@ -122,6 +125,43 @@ async def assign_order_to_worker(
         order_id=order_id,
         worker_id=request.worker_id
     )
+
+
+@router.get(
+    "/{order_number}",
+    response_model=StandardResponse[OrderListItem],
+    status_code=status.HTTP_200_OK,
+    summary="Get Order Detail",
+    description="Get detailed information about a specific order by order number"
+)
+async def get_order_detail(
+    order_number: str = Path(..., description="Order number to retrieve"),
+    current_user: TokenData = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+) -> StandardResponse[OrderListItem]:
+    """
+    Get detailed information about a specific order by order number.
+
+    This endpoint will:
+    - Retrieve the order by order_number
+    - Return order with all nested relationships (OrderItems, Session, Guest, CheckinRoom, Room)
+    - Validate that the order exists
+
+    Args:
+        order_number: Order number to retrieve (e.g., "ORD-001")
+        current_user: Current authenticated user (from token)
+        db: Database session dependency
+
+    Returns:
+        StandardResponse[OrderListItem]: Order detail with all relationships
+
+    Raises:
+        404: Order not found
+        401: Unauthorized (if token is invalid)
+        500: Internal server error
+    """
+    service = OrderService(db)
+    return await service.get_order_detail_by_order_number(order_number=order_number)
 
 
 @router.patch(

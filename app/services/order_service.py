@@ -29,7 +29,8 @@ class OrderService:
     async def list_orders(
         self,
         org_id: Optional[UUID],
-        params: PaginationParams
+        params: PaginationParams,
+        category: Optional = None
     ) -> StandardResponse[List[OrderListItem]]:
         """
         List orders for an organization with pagination
@@ -37,6 +38,7 @@ class OrderService:
         Args:
             org_id: Optional organization ID to filter orders
             params: Pagination parameters (page, per_page, keyword, order)
+            category: Optional order category to filter by
 
         Returns:
             StandardResponse[List[OrderListItem]]: Standard response with paginated list of orders
@@ -46,7 +48,7 @@ class OrderService:
         """
         try:
             # Get base query for orders
-            query = self.repository.get_orders_query(org_id=org_id)
+            query = self.repository.get_orders_query(org_id=org_id, category=category)
 
             # Apply pagination, search, and ordering
             result = await paginate_query(
@@ -60,8 +62,7 @@ class OrderService:
             # Convert Order objects to OrderListItem with nested relationships
             order_items = []
             for order in result.data:
-                # Get order items
-                order_item_objs = await self.repository.get_order_items_by_order_id(order.id)
+                # Get order items (already loaded via relationship)
                 items = [
                     OrderItemSchema(
                         id=item.id,
@@ -71,7 +72,7 @@ class OrderService:
                         price=item.price,
                         note=item.note
                     )
-                    for item in order_item_objs
+                    for item in order.order_items if item.deleted_at is None
                 ]
 
                 # Get session if available
@@ -83,17 +84,15 @@ class OrderService:
                     # Get session (already loaded via relationship)
                     session_obj = order.session
                     if session_obj:
-                        # Get guest user
+                        # Get guest user (already loaded via relationship)
                         guest = None
-                        if order.guest_id:
-                            guest_obj = await self.repository.get_user_by_id(order.guest_id)
-                            if guest_obj:
-                                guest = GuestItem(
-                                    id=guest_obj.id,
-                                    name=guest_obj.name,
-                                    email=guest_obj.email,
-                                    mobile_phone=guest_obj.mobile_phone
-                                )
+                        if order.guest:
+                            guest = GuestItem(
+                                id=order.guest.id,
+                                name=order.guest.name,
+                                email=order.guest.email,
+                                mobile_phone=order.guest.mobile_phone
+                            )
 
                         # Build session item with guest nested inside
                         session = SessionItem(
