@@ -157,6 +157,30 @@ class OrderRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_order_by_order_number(self, order_number: str) -> Optional[Order]:
+        """Get order by order number with all relationships
+
+        Args:
+            order_number: Order number
+
+        Returns:
+            Order object with relationships loaded or None
+        """
+        result = await self.db.execute(
+            select(Order)
+            .options(
+                selectinload(Order.session).selectinload(Session.checkin_room),
+                selectinload(Order.guest),
+                selectinload(Order.organization),
+                selectinload(Order.order_items)
+            )
+            .where(
+                Order.order_number == order_number,
+                Order.deleted_at.is_(None)
+            )
+        )
+        return result.scalar_one_or_none()
+
     async def update_order_status(self, order_id: UUID, status) -> Optional[Order]:
         """Update order status
 
@@ -173,3 +197,54 @@ class OrderRepository:
             await self.db.commit()
             await self.db.refresh(order)
         return order
+
+    async def get_session_by_id(self, session_id: UUID) -> Optional[Session]:
+        """Get session by ID
+
+        Args:
+            session_id: Session ID
+
+        Returns:
+            Session object or None
+        """
+        result = await self.db.execute(
+            select(Session).where(
+                Session.id == session_id,
+                Session.deleted_at.is_(None)
+            )
+        )
+        return result.scalar_one_or_none()
+
+    def get_orders_by_session_query(self, user_id: UUID) -> Select:
+        """Get query for orders by user_id with all relationships
+
+        Query starts from orders table, then joins to:
+        - Session (via session_id)
+        - User/Guest (via guest_id)
+        - Organization (via org_id)
+        - OrderItems (via order_id)
+        - CheckinRoom (via session.checkin_room_id)
+        - Room (via checkin_room.room_id)
+
+        Args:
+            user_id: User ID to filter orders by guest_id
+
+        Returns:
+            SQLAlchemy Select query for orders with relationships
+        """
+        # Start from orders table with eager loading
+        query = (
+            select(Order)
+            .options(
+                selectinload(Order.session).selectinload(Session.checkin_room),
+                selectinload(Order.guest),
+                selectinload(Order.organization),
+                selectinload(Order.order_items)
+            )
+            .where(
+                Order.guest_id == user_id,
+                Order.deleted_at.is_(None)
+            )
+        )
+
+        return query

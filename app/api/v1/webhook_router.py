@@ -3,6 +3,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.exceptions import ComposeError
+from typing import List
+from uuid import UUID
+from fastapi import Query
+
 from app.schemas.webhook import (
     WahaWebhookRequest,
     WahaWebhookResponse,
@@ -11,8 +15,10 @@ from app.schemas.webhook import (
     SendMessageRequest
 )
 from app.schemas.response import StandardResponse, create_success_response
+from app.schemas.order import OrderListItem
 from app.services.webhook_service import WebhookService
 from app.services.order_webhook_service import OrderWebhookService
+from app.services.order_service import OrderService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -169,5 +175,91 @@ async def send_message(
         raise
     except Exception as e:
         logger.error(f"Unexpected error processing send-message webhook: {str(e)}", exc_info=True)
+        # Re-raise to let general exception handler handle it
+        raise
+
+
+@router.get("/orders", response_model=StandardResponse[List[OrderListItem]])
+async def list_orders_by_session(
+    request: Request,
+    session_id: UUID = Query(..., description="Session ID to filter orders"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    List orders by session_id.
+
+    This endpoint retrieves orders based on session_id, joins with session table.
+    The response includes:
+    - Order details
+    - Order items
+    - Guest user information
+    - Organization information
+    - Room information (via session -> checkin_room -> room)
+    - Session information
+
+    Query parameters:
+    - session_id (required): Session ID to filter orders
+
+    Example:
+    ```
+    GET /webhook/orders?session_id=123e4567-e89b-12d3-a456-426614174000
+    ```
+    """
+    try:
+        # Log the incoming request
+        logger.info(f"Received list orders request: session_id={session_id}")
+
+        # Use order service to handle the business logic
+        order_service = OrderService(db)
+        return await order_service.list_orders_by_session(session_id=session_id)
+
+    except ComposeError:
+        # Let ComposeError pass through to be handled by error handler middleware
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error listing orders by session: {str(e)}", exc_info=True)
+        # Re-raise to let general exception handler handle it
+        raise
+
+
+@router.get("/orders/{order_number}", response_model=StandardResponse[OrderListItem])
+async def get_order_detail(
+    request: Request,
+    order_number: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get order detail by order_number.
+
+    This endpoint retrieves a single order by order_number with all relationships.
+    The response includes:
+    - Order details
+    - Order items
+    - Guest user information
+    - Organization information
+    - Room information (via session -> checkin_room -> room)
+    - Session information
+
+    Path parameters:
+    - order_number (required): Order number to retrieve
+
+    Example:
+    ```
+    GET /webhook/orders/1234567890
+    ```
+    """
+    try:
+        # Log the incoming request
+        logger.info(f"Received get order detail request: order_number={order_number}")
+
+        # Use order service to handle the business logic
+        order_service = OrderService(db)
+        return await order_service.get_order_detail_by_order_number(order_number=order_number)
+
+    except ComposeError:
+        # Let ComposeError pass through to be handled by error handler middleware
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error getting order detail: {str(e)}", exc_info=True)
         # Re-raise to let general exception handler handle it
         raise
