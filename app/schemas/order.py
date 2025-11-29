@@ -2,7 +2,7 @@
 from datetime import date, datetime
 from uuid import UUID
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 from app.models.order import OrderStatus
 from app.models.order_item import OrderItem

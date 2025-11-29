@@ -21,13 +21,15 @@ class H2HAgentRouterService:
 
     async def create_agent(
         self,
-        session_id: UUID
+        session_id: UUID,
+        category: Optional[str] = None
     ) -> dict:
         """
         Create agent via H2H Agent Router API.
 
         Args:
             session_id: Session ID (UUID) to use as identifier_id
+            category: Agent category (e.g., "room_service", "general_information", "customer_service")
 
         Returns:
             Response from H2H Agent Router API
@@ -40,6 +42,10 @@ class H2HAgentRouterService:
         payload = {
             "identifier_id": str(session_id)
         }
+
+        # Add category to payload if provided
+        if category:
+            payload["category"] = category
 
         # Prepare headers with API key if configured
         headers = {

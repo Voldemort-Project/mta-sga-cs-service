@@ -31,7 +31,6 @@ class GuestRegisterResponse(BaseModel):
     """Response schema for guest registration"""
     user_id: UUID = Field(..., description="Guest user ID")
     checkin_id: UUID = Field(..., description="Check-in ID")
-    session_id: UUID = Field(..., description="Session ID")
     full_name: str = Field(..., description="Guest full name")
     room_number: str = Field(..., description="Room number")
     checkin_date: date = Field(..., description="Check-in date")
@@ -46,7 +45,6 @@ class GuestRegisterResponse(BaseModel):
                 {
                     "user_id": "123e4567-e89b-12d3-a456-426614174000",
                     "checkin_id": "123e4567-e89b-12d3-a456-426614174001",
-                    "session_id": "123e4567-e89b-12d3-a456-426614174002",
                     "full_name": "John Doe",
                     "room_number": "101",
                     "checkin_date": "2024-01-15",

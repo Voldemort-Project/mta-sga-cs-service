@@ -21,14 +21,6 @@ class OrderStatus(enum.Enum):
     suspended = "suspended"
 
 
-class OrderCategory(enum.Enum):
-    """Order category enum"""
-    housekeeping = "housekeeping"
-    room_service = "room_service"
-    maintenance = "maintenance"
-    concierge = "concierge"
-
-
 class Order(Base):
     """Order model"""
 
@@ -39,7 +31,8 @@ class Order(Base):
     session_id = Column(UUID(as_uuid=True), ForeignKey("sessions.id"), nullable=True)
     guest_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=True)
-    category = Column(SQLEnum(OrderCategory, name="enum_order_category"), nullable=False)
+    checkin_room_id = Column(UUID(as_uuid=True), ForeignKey("checkin_rooms.id"), nullable=True)
+    division_id = Column(UUID(as_uuid=True), ForeignKey("divisions.id"), nullable=True)
     notes = Column(Text, nullable=True)
     additional_notes = Column(Text, nullable=True)
     status = Column(SQLEnum(OrderStatus, name="enum_order_status"), default=OrderStatus.pending, nullable=True)
@@ -52,5 +45,7 @@ class Order(Base):
     session = relationship("Session", back_populates="orders", foreign_keys=[session_id])
     guest = relationship("User", back_populates="orders", foreign_keys=[guest_id])
     organization = relationship("Organization", back_populates="orders", foreign_keys=[org_id])
+    checkin_room = relationship("CheckinRoom", foreign_keys=[checkin_room_id])
+    division = relationship("Division", foreign_keys=[division_id])
     order_items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
     order_assigners = relationship("OrderAssigner", back_populates="order", foreign_keys="OrderAssigner.order_id")

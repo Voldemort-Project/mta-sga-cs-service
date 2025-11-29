@@ -30,7 +30,7 @@ class OrderService:
         self,
         org_id: Optional[UUID],
         params: PaginationParams,
-        category: Optional = None
+        division_id: Optional[UUID] = None
     ) -> StandardResponse[List[OrderListItem]]:
         """
         List orders for an organization with pagination
@@ -38,7 +38,7 @@ class OrderService:
         Args:
             org_id: Optional organization ID to filter orders
             params: Pagination parameters (page, per_page, keyword, order)
-            category: Optional order category to filter by
+            division_id: Optional division ID to filter by
 
         Returns:
             StandardResponse[List[OrderListItem]]: Standard response with paginated list of orders
@@ -48,7 +48,7 @@ class OrderService:
         """
         try:
             # Get base query for orders
-            query = self.repository.get_orders_query(org_id=org_id, category=category)
+            query = self.repository.get_orders_query(org_id=org_id, division_id=division_id)
 
             # Apply pagination, search, and ordering
             result = await paginate_query(
@@ -56,7 +56,7 @@ class OrderService:
                 query=query,
                 params=params,
                 model=Order,
-                search_fields=["order_number", "category"]
+                search_fields=["order_number"]
             )
 
             # Convert Order objects to OrderListItem with nested relationships
@@ -137,13 +137,16 @@ class OrderService:
                 # Extract order_date from created_at
                 order_date = order.created_at.date() if order.created_at else None
 
+                # Get division name from division relationship
+                division_name = order.division.name if order.division else None
+
                 # Build order item
                 order_item = OrderListItem(
                     id=order.id,
                     order_number=order.order_number,
                     order_date=order_date,
                     order_status=order.status,
-                    category=order.category.value if hasattr(order.category, 'value') else order.category,
+                    category=division_name,
                     note=order.notes,
                     additional_note=order.additional_notes,
                     total_amount=order.total_amount,
@@ -366,13 +369,16 @@ class OrderService:
                 # Extract order_date from created_at
                 order_date = order.created_at.date() if order.created_at else None
 
+                # Get division name from division relationship
+                division_name = order.division.name if order.division else None
+
                 # Build order item
                 order_item = OrderListItem(
                     id=order.id,
                     order_number=order.order_number,
                     order_date=order_date,
                     order_status=order.status,
-                    category=order.category.value if hasattr(order.category, 'value') else order.category,
+                    category=division_name,
                     note=order.notes,
                     additional_note=order.additional_notes,
                     total_amount=order.total_amount,
@@ -511,13 +517,16 @@ class OrderService:
             # Extract order_date from created_at
             order_date = order.created_at.date() if order.created_at else None
 
+            # Get division name from division relationship
+            division_name = order.division.name if order.division else None
+
             # Build order item
             order_item = OrderListItem(
                 id=order.id,
                 order_number=order.order_number,
                 order_date=order_date,
                 order_status=order.status,
-                category=order.category.value if hasattr(order.category, 'value') else order.category,
+                category=division_name,
                 note=order.notes,
                 additional_note=order.additional_notes,
                 total_amount=order.total_amount,

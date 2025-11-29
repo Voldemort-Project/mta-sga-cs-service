@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 import enum
 
-from sqlalchemy import Column, BigInteger, TIMESTAMP, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Column, BigInteger, TIMESTAMP, ForeignKey, Enum as SQLEnum, String, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -30,6 +30,8 @@ class Session(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     status = Column(SQLEnum(SessionStatus, name="enum_session_status"), default=SessionStatus.open, nullable=True)
     mode = Column(SQLEnum(SessionMode, name="enum_session_mode"), default=SessionMode.agent, nullable=True)
+    agent_created = Column(Boolean, default=False, nullable=False)
+    category = Column(String(50), nullable=True)
     start = Column(TIMESTAMP(timezone=True), nullable=True)
     end = Column(TIMESTAMP(timezone=True), nullable=True)
     duration = Column(BigInteger, nullable=True)

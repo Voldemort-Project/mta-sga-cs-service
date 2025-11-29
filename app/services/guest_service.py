@@ -13,10 +13,7 @@ from app.constants.error_codes import ErrorCode
 from app.repositories.guest_repository import GuestRepository
 from app.schemas.guest import GuestRegisterRequest, GuestRegisterResponse, GuestListItem
 from app.schemas.response import StandardResponse, create_paginated_response, create_success_response
-from app.models.message import MessageRole
 from app.models.user import User
-from app.models.session import SessionStatus, SessionMode
-from app.integrations.waha import WahaService
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +24,6 @@ class GuestService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.repository = GuestRepository(db)
-        self.waha_service = WahaService()
 
     async def register_guest(
         self,
@@ -76,14 +72,23 @@ class GuestService:
             )
 
         try:
-            # Create guest user
-            user = await self.repository.create_guest_user(
-                name=request.full_name,
-                email=request.email,
-                phone=request.phone_number,
-                role_id=guest_role.id,
-                org_id=org_id
-            )
+            # Check if user with this phone number already exists
+            existing_user = await self.repository.get_user_by_phone(request.phone_number)
+
+            if existing_user:
+                # User has stayed at the hotel before, reuse existing data
+                logger.info(f"Found existing user with phone {request.phone_number}, reusing user data")
+                user = existing_user
+            else:
+                # Create new guest user
+                logger.info(f"Creating new guest user with phone {request.phone_number}")
+                user = await self.repository.create_guest_user(
+                    name=request.full_name,
+                    email=request.email,
+                    phone=request.phone_number,
+                    role_id=guest_role.id,
+                    org_id=org_id
+                )
 
             # Create check-in with current time
             current_time = datetime.now().time()
@@ -92,43 +97,12 @@ class GuestService:
                 checkin_date=request.checkin_date,
                 checkin_time=current_time,
                 org_id=org_id or room.org_id,
-                user_id=user_id
+                guest_id=user.id,
+                admin_id=user_id
             )
 
             # Update room status to booked
             await self.repository.update_room_booked_status(room.id, True)
-
-            # Create chat session for the guest
-            session = await self.repository.create_session(
-                user_id=user.id,
-                checkin_room_id=checkin.id,
-                status=SessionStatus.open,
-                mode=SessionMode.agent
-            )
-
-            # Create welcome message and save to database
-            # welcome_text = (
-            #     f"Halo {user.name}! 👋\n\n"
-            #     f"Selamat datang di hotel kami. Anda telah berhasil check-in di kamar {room.room_number}.\n\n"
-            #     f"Jika Anda membutuhkan bantuan atau memiliki pertanyaan, "
-            #     f"silakan balas pesan ini dan kami akan segera membantu Anda.\n\n"
-            #     f"Terima kasih telah memilih hotel kami. Semoga Anda menikmati masa menginap Anda! 🏨"
-            # )
-
-            # await self.repository.create_message(
-            #     session_id=session.id,
-            #     role=MessageRole.System,
-            #     text=welcome_text
-            # )
-
-            # Send welcome message via WAHA (must succeed before commit)
-            # This is part of the atomic transaction - if this fails, everything rolls back
-            # logger.info(f"Sending welcome message to guest {user.name} at {user.mobile_phone}")
-            # await self.waha_service.send_text_message(
-            #     phone_number=user.mobile_phone,
-            #     text=welcome_text
-            # )
-            # logger.info(f"Welcome message sent successfully to {user.mobile_phone}")
 
             # Commit transaction (only if everything above succeeded)
             await self.db.commit()
@@ -138,7 +112,6 @@ class GuestService:
             return GuestRegisterResponse(
                 user_id=user.id,
                 checkin_id=checkin.id,
-                session_id=session.id,
                 full_name=user.name,
                 room_number=room.room_number,
                 checkin_date=request.checkin_date,

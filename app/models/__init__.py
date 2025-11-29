@@ -5,7 +5,7 @@ from app.models.role import Role
 from app.models.user import User
 from app.models.room import Room
 from app.models.checkin import CheckinRoom
-from app.models.order import Order, OrderStatus, OrderCategory
+from app.models.order import Order, OrderStatus
 from app.models.order_item import OrderItem
 from app.models.order_assigner import OrderAssigner, OrderAssignerStatus
 from app.models.session import Session, SessionStatus, SessionMode
@@ -20,7 +20,6 @@ __all__ = [
     "CheckinRoom",
     "Order",
     "OrderStatus",
-    "OrderCategory",
     "OrderItem",
     "OrderAssigner",
     "OrderAssignerStatus",

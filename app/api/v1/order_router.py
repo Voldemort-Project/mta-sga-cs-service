@@ -12,7 +12,6 @@ from app.schemas.order import OrderListItem, AssignOrderRequest, OrderAssignerRe
 from app.schemas.response import StandardResponse
 from app.services.order_service import OrderService
 from app.services.order_assigner_service import OrderAssignerService
-from app.models.order import OrderCategory
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -27,9 +26,9 @@ router = APIRouter(prefix="/orders", tags=["Orders"])
 async def list_orders(
     page: int = Query(1, ge=1, description="Current page number"),
     per_page: int = Query(10, ge=1, le=100, description="Items per page"),
-    keyword: Optional[str] = Query(None, description="Search keyword (searches in order_number, category)"),
+    keyword: Optional[str] = Query(None, description="Search keyword (searches in order_number)"),
     order: Optional[str] = Query(None, description="Order string (e.g., 'created_at:desc;order_number:asc')"),
-    category: Optional[OrderCategory] = Query(None, description="Filter by order category (housekeeping, room_service, maintenance, concierge)"),
+    division_id: Optional[uuid.UUID] = Query(None, description="Filter by division ID"),
     current_user: TokenData = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> StandardResponse[List[OrderListItem]]:
@@ -38,16 +37,16 @@ async def list_orders(
 
     This endpoint will:
     - Filter orders by the organization of the currently logged-in user
-    - Support pagination, search, ordering, and filtering by category
-    - Return orders with nested relationships (Session, Guest, CheckinRoom, Room, OrderItems)
+    - Support pagination, search, ordering, and filtering by division
+    - Return orders with nested relationships (Session, Guest, CheckinRoom, Room, OrderItems, Division)
 
     Args:
         page: Page number (starts from 1)
         per_page: Number of items per page (1-100)
-        keyword: Optional search keyword to filter by order_number or category
+        keyword: Optional search keyword to filter by order_number
         order: Optional order string in format "field:direction;field2:direction2"
                e.g., "created_at:desc;order_number:asc"
-        category: Optional filter by order category (housekeeping, room_service, maintenance, concierge)
+        division_id: Optional filter by division ID
         current_user: Current authenticated user (from token)
         db: Database session dependency
 
@@ -73,7 +72,7 @@ async def list_orders(
     )
 
     service = OrderService(db)
-    return await service.list_orders(org_id=org_id, params=params, category=category)
+    return await service.list_orders(org_id=org_id, params=params, division_id=division_id)
 
 
 @router.post(

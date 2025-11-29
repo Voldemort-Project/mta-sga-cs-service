@@ -14,6 +14,7 @@ from app.models.role import Role
 from app.models.session import Session
 from app.models.message import Message, MessageRole
 from app.models.order import Order
+from app.models.division import Division
 
 
 class GuestRepository:
@@ -64,7 +65,8 @@ class GuestRepository:
         checkin_date: date,
         checkin_time: time,
         org_id: UUID,
-        user_id: Optional[UUID] = None
+        guest_id: Optional[UUID] = None,
+        admin_id: Optional[UUID] = None
     ) -> CheckinRoom:
         """Create a new check-in
 
@@ -73,11 +75,13 @@ class GuestRepository:
             checkin_date: Check-in date
             checkin_time: Check-in time
             org_id: Organization ID
-            user_id: User ID of the admin who registered the guest (optional)
+            guest_id: Guest user ID (optional)
+            admin_id: Admin user ID who registered the guest (optional)
         """
         checkin = CheckinRoom(
             org_id=org_id,
-            user_id=user_id,
+            guest_id=guest_id,
+            admin_id=admin_id,
             room_id=room_id,
             checkin_date=checkin_date,
             checkin_time=checkin_time,
@@ -135,9 +139,12 @@ class GuestRepository:
         return message
 
     async def get_user_by_phone(self, phone: str) -> Optional[User]:
-        """Get user by phone number"""
+        """Get user by phone number (excludes soft-deleted users)"""
         result = await self.db.execute(
-            select(User).where(User.mobile_phone == phone)
+            select(User).where(
+                User.mobile_phone == phone,
+                User.deleted_at.is_(None)
+            )
         )
         return result.scalar_one_or_none()
 
@@ -183,6 +190,28 @@ class GuestRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_active_checkin_by_guest_id(self, guest_user_id: UUID) -> Optional[CheckinRoom]:
+        """Get active checkin room for a guest user
+
+        Args:
+            guest_user_id: Guest user ID to find active checkin
+
+        Returns:
+            Active CheckinRoom or None if not found
+        """
+        # Query directly from checkin_rooms table
+        result = await self.db.execute(
+            select(CheckinRoom)
+            .where(
+                CheckinRoom.guest_id == guest_user_id,
+                CheckinRoom.status == "active",
+                CheckinRoom.deleted_at.is_(None)
+            )
+            .order_by(CheckinRoom.created_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
     async def get_session_with_user(self, session_id: UUID) -> Optional[Session]:
         """Get session by session ID with user relationship loaded"""
         from sqlalchemy.orm import joinedload
@@ -196,38 +225,61 @@ class GuestRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_division_by_name(self, name: str, org_id: Optional[UUID] = None) -> Optional[Division]:
+        """Get division by name
+
+        Args:
+            name: Division name to search for
+            org_id: Organization ID to filter by (optional)
+
+        Returns:
+            Division object or None if not found
+        """
+        query = select(Division).where(
+            Division.name == name,
+            Division.deleted_at.is_(None)
+        )
+        if org_id:
+            query = query.where(Division.org_id == org_id)
+
+        result = await self.db.execute(query)
+        return result.scalar_one_or_none()
+
     async def create_order(
         self,
         session_id: UUID,
         guest_id: UUID,
-        category: str,
+        division_id: UUID,
         order_number: str,
         notes: Optional[str] = None,
         additional_notes: Optional[str] = None,
         org_id: Optional[UUID] = None,
-        total_amount: float = 0
+        total_amount: float = 0,
+        checkin_room_id: Optional[UUID] = None
     ) -> Order:
         """Create a new order
 
         Args:
             session_id: Session ID
             guest_id: Guest user ID
-            category: Order category (housekeeping, room_service, maintenance, concierge)
+            division_id: Division ID (foreign key to divisions table)
             order_number: Unique order number
             notes: Order notes (optional)
             additional_notes: Additional order notes (optional)
             org_id: Organization ID (optional)
             total_amount: Total amount (optional, default: 0)
+            checkin_room_id: Check-in room ID (optional)
         """
         order = Order(
             session_id=session_id,
             guest_id=guest_id,
             org_id=org_id,
-            category=category,
+            division_id=division_id,
             notes=notes,
             additional_notes=additional_notes,
             order_number=order_number,
-            total_amount=total_amount
+            total_amount=total_amount,
+            checkin_room_id=checkin_room_id
         )
         self.db.add(order)
         await self.db.flush()
@@ -341,6 +393,33 @@ class GuestRepository:
 
             duration_seconds = int((end_time - start_time).total_seconds())
             session.duration = duration_seconds
+
+        await self.db.flush()
+        return session
+
+    async def update_session_agent_status(
+        self,
+        session_id: UUID,
+        agent_created: bool,
+        category: Optional[str] = None
+    ) -> Optional[Session]:
+        """Update session agent creation status and category
+
+        Args:
+            session_id: Session ID to update
+            agent_created: Whether agent has been created
+            category: Agent category (e.g., "room_service", "general_information", "customer_service")
+
+        Returns:
+            Updated Session object or None if session not found
+        """
+        session = await self.get_session_by_id(session_id)
+        if not session:
+            return None
+
+        session.agent_created = agent_created
+        if category:
+            session.category = category
 
         await self.db.flush()
         return session

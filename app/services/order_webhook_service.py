@@ -82,6 +82,19 @@ class OrderWebhookService:
 
             # Process each order in the request
             for order_request in request.orders:
+                # Lookup division by name
+                division = await self.repository.get_division_by_name(
+                    name=order_request.category.value,
+                    org_id=org_id
+                )
+
+                if not division:
+                    raise ComposeError(
+                        error_code=ErrorCode.General.NOT_FOUND,
+                        message=f"Division not found with name: {order_request.category.value}",
+                        http_status_code=status.HTTP_404_NOT_FOUND
+                    )
+
                 # Generate unique order number
                 order_number = self._generate_order_number()
 
@@ -95,12 +108,13 @@ class OrderWebhookService:
                 order = await self.repository.create_order(
                     session_id=request.session_id,
                     guest_id=guest_id,
-                    category=order_request.category.value,
+                    division_id=division.id,
                     order_number=order_number,
                     notes=order_request.note,
                     additional_notes=order_request.additional_note,
                     org_id=org_id,
-                    total_amount=total_amount
+                    total_amount=total_amount,
+                    checkin_room_id=session.checkin_room_id
                 )
 
                 # Create order items
