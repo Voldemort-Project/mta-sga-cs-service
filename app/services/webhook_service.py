@@ -232,11 +232,24 @@ class WebhookService:
                 user_name=user.name
             )
 
-            # Reload session after creation
-            session = await self.repository.get_active_session_by_user_id(user.id)
-            if not session:
-                logger.error(f"Failed to retrieve session for user {user.id}")
-                return
+            # Save the user's message that triggered session creation
+            try:
+                await self.repository.create_message(
+                    session_id=session.id,
+                    role=MessageRole.User,
+                    text=payload.body or ""
+                )
+                await self.db.commit()
+                logger.info(f"Saved initial message for new session {session.id}")
+            except Exception as e:
+                await self.db.rollback()
+                logger.error(f"Error saving initial message for session {session.id}: {str(e)}")
+                raise
+
+            # Return early - don't process the message that triggered session creation
+            # Only welcome_text should be sent when session is first created
+            logger.info(f"Session {session.id} created and welcome message sent. Waiting for next message.")
+            return
 
         # Check for /end command to terminate session
         user_message = (payload.body or "").strip()
