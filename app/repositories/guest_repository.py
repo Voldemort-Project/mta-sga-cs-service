@@ -38,6 +38,26 @@ class GuestRepository:
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
+    async def get_available_rooms(self, org_id: UUID) -> List[Room]:
+        """Get all available (not booked) rooms for an organization
+
+        Args:
+            org_id: Organization ID to filter rooms
+
+        Returns:
+            List of available Room objects
+        """
+        result = await self.db.execute(
+            select(Room)
+            .where(
+                Room.org_id == org_id,
+                Room.is_booked == False,
+                Room.deleted_at.is_(None)
+            )
+            .order_by(Room.room_number.asc())
+        )
+        return list(result.scalars().all())
+
     async def create_guest_user(
         self,
         name: str,

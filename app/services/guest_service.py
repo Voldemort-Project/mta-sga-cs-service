@@ -12,6 +12,7 @@ from app.core.exceptions import ComposeError
 from app.constants.error_codes import ErrorCode
 from app.repositories.guest_repository import GuestRepository
 from app.schemas.guest import GuestRegisterRequest, GuestRegisterResponse, GuestListItem
+from app.schemas.room import RoomListItem
 from app.schemas.response import StandardResponse, create_paginated_response, create_success_response
 from app.models.user import User
 
@@ -273,6 +274,38 @@ class GuestService:
             raise ComposeError(
                 error_code=ErrorCode.Guest.CHECKOUT_FAILED,
                 message="Failed to checkout guest. Please try again or contact support.",
+                http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                original_error=e
+            )
+
+    async def get_available_rooms(self, org_id: UUID) -> StandardResponse[List[RoomListItem]]:
+        """
+        Get list of available rooms for an organization
+
+        Args:
+            org_id: Organization ID to filter rooms
+
+        Returns:
+            StandardResponse[List[RoomListItem]]: List of available rooms
+
+        Raises:
+            ComposeError: If there's an error fetching rooms
+        """
+        try:
+            rooms = await self.repository.get_available_rooms(org_id)
+
+            # Convert to schema
+            room_items = [RoomListItem.model_validate(room) for room in rooms]
+
+            return create_success_response(
+                data=room_items,
+                message=f"Found {len(room_items)} available room(s)"
+            )
+        except Exception as e:
+            logger.error(f"Failed to fetch available rooms for org {org_id}: {str(e)}", exc_info=True)
+            raise ComposeError(
+                error_code=ErrorCode.Guest.ROOM_NOT_FOUND,
+                message="Failed to fetch available rooms. Please try again.",
                 http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 original_error=e
             )

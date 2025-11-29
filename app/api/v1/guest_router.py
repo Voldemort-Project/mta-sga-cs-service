@@ -10,6 +10,7 @@ from app.core.pagination import PaginationParams
 from app.core.security import get_current_user
 from app.schemas.auth import TokenData
 from app.schemas.guest import GuestRegisterRequest, GuestRegisterResponse, GuestListItem, GuestCheckoutResponse
+from app.schemas.room import RoomListItem
 from app.schemas.response import StandardResponse, create_success_response
 from app.services.guest_service import GuestService
 # from app.integrations.h2h import H2HAgentRouterService
@@ -206,3 +207,47 @@ async def checkout_guest(
         data=checkout_response,
         message=result.message
     )
+
+
+@router.get(
+    "/rooms/available",
+    response_model=StandardResponse[List[RoomListItem]],
+    status_code=status.HTTP_200_OK,
+    summary="List Available Rooms",
+    description="Get list of available rooms for the current user's organization"
+)
+async def list_available_rooms(
+    current_user: TokenData = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+) -> StandardResponse[List[RoomListItem]]:
+    """
+    Get list of available (not booked) rooms for the current user's organization.
+
+    This endpoint will:
+    - Filter rooms by the organization of the currently logged-in user
+    - Only show rooms that are not currently booked (is_booked = False)
+    - Return rooms sorted by room number
+
+    Args:
+        current_user: Current authenticated user (from token)
+        db: Database session dependency
+
+    Returns:
+        StandardResponse[List[RoomListItem]]: List of available rooms
+
+    Raises:
+        400: User organization not found
+        401: Unauthorized (if token is invalid)
+        500: Internal server error
+    """
+    # Get organization ID from current user
+    if not current_user.organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User organization not found. Please ensure you are associated with an organization."
+        )
+
+    org_id = uuid.UUID(current_user.organization_id)
+
+    service = GuestService(db)
+    return await service.get_available_rooms(org_id=org_id)
