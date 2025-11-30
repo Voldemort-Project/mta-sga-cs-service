@@ -4,6 +4,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import BackgroundTasks
 
 from app.repositories.guest_repository import GuestRepository
 from app.models.message import MessageRole
@@ -103,6 +104,53 @@ class WebhookService:
 
         return category_map.get(message_text)
 
+    async def _send_h2h_message_background(self, session_id: UUID, message: str, phone_number: str) -> None:
+        """
+        Send message to H2H service in background and forward response to guest via WAHA.
+        This method is run as a background task.
+
+        Args:
+            session_id: Session ID
+            message: Message text to send
+            phone_number: Guest's phone number (local format with leading 0)
+        """
+        try:
+            # Send message to H2H and get response
+            result = await self.h2h_service.send_chat_message(session_id, message)
+            logger.info(f"H2H chat message sent successfully for session {session_id}: {result}")
+
+            # Extract reply message from H2H response
+            # Check various possible fields where the response message might be
+            reply_message = None
+            if isinstance(result, dict):
+                # Common field names for response message
+                res_data = result.get("data")
+                if isinstance(res_data, dict):
+                    reply_message = res_data.get("responses")
+                else:
+                    reply_message = (
+                        result.get("data").get("responses") or
+                        result.get("reply") or
+                        result.get("content") or
+                        result.get("response") or
+                        result.get("text")
+                    )
+
+            if reply_message:
+                # Send the reply to guest via WAHA
+                waha_phone = format_phone_international_id(phone_number)
+                await self.waha_service.send_text_message(
+                    phone_number=waha_phone,
+                    text=reply_message
+                )
+                logger.info(f"H2H response forwarded to guest {phone_number} for session {session_id}")
+            else:
+                logger.warning(f"No reply message found in H2H response for session {session_id}: {result}")
+
+        except Exception as e:
+            logger.error(f"Failed to send H2H message or forward response for session {session_id}: {str(e)}")
+            # Don't fail - this is a background task
+
     async def _create_agent_with_category(self, session_id: UUID, category: str) -> bool:
         """
         Create agent via H2H with specified category.
@@ -116,11 +164,11 @@ class WebhookService:
         """
         try:
             # Create agent via H2H
-            # agent_result = await self.h2h_service.create_agent(
-            #     session_id=session_id,
-            #     category=category
-            # )
-            # logger.info(f"Agent created successfully for session {session_id} with category {category}: {agent_result}")
+            agent_result = await self.h2h_service.create_agent(
+                session_id=session_id,
+                category=category
+            )
+            logger.info(f"Agent created successfully for session {session_id} with category {category}: {agent_result}")
 
             # Update session to mark agent as created
             await self.repository.update_session_agent_status(
@@ -135,7 +183,7 @@ class WebhookService:
             logger.error(f"Failed to create agent for session {session_id}: {str(e)}")
             return False
 
-    async def handle_incoming_message(self, webhook_data: WahaWebhookRequest) -> None:
+    async def handle_incoming_message(self, webhook_data: WahaWebhookRequest, background_tasks: BackgroundTasks) -> None:
         """
         Handle incoming message from guest with improved flow logic.
 
@@ -147,6 +195,7 @@ class WebhookService:
 
         Args:
             webhook_data: Webhook data from WAHA
+            background_tasks: FastAPI background tasks
         """
         payload = webhook_data.payload
 
@@ -368,33 +417,23 @@ class WebhookService:
                     logger.info(f"User {user.id} sent invalid command, reminded to select category")
             else:
                 # Agent already created - normal conversation flow
-                # Send auto-reply
-                auto_reply_text = (
-                    "Terima kasih atas pesan Anda. 🙏\n\n"
-                    "Tim kami akan segera merespons pertanyaan Anda. "
-                    "Mohon menunggu sebentar.\n\n"
-                    "Waktu respon normal: 5-10 menit"
-                )
-
-                # Save auto-reply to database with System role
-                await self.repository.create_message(
-                    session_id=session.id,
-                    role=MessageRole.System,
-                    text=auto_reply_text
-                )
-                await self.db.commit()
-
-                # Send auto-reply via WAHA
+                # Send typing indicator only
                 try:
                     waha_phone = format_phone_international_id(phone_number)
-                    await self.waha_service.send_text_message(
-                        phone_number=waha_phone,
-                        text=auto_reply_text
-                    )
-                    logger.info(f"Auto-reply sent to {phone_number}")
+                    await self.waha_service.send_typing_indicator(phone_number=waha_phone)
                 except Exception as e:
-                    logger.error(f"Failed to send auto-reply to {phone_number}: {str(e)}")
+                    logger.error(f"Failed to send typing indicator to {phone_number}: {str(e)}")
                     # Don't fail the whole operation if sending fails
+
+                await self.db.commit()
+
+                # Send H2H message in background and forward response to guest
+                background_tasks.add_task(
+                    self._send_h2h_message_background,
+                    session.id,
+                    user_message,
+                    phone_number
+                )
 
         except Exception as e:
             await self.db.rollback()

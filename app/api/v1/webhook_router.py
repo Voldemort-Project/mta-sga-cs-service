@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, HTTPException, Depends
+from fastapi import APIRouter, Request, HTTPException, Depends, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -30,6 +30,7 @@ router = APIRouter(prefix="/webhook", tags=["Webhook"])
 async def waha_webhook(
     request: Request,
     webhook_data: WahaWebhookRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -45,7 +46,7 @@ async def waha_webhook(
 
         # Handle different event types
         if webhook_data.event == "message":
-            await handle_message_event(webhook_data, db)
+            await handle_message_event(webhook_data, db, background_tasks)
         else:
             logger.info(f"Unhandled event type: {webhook_data.event}")
 
@@ -59,13 +60,14 @@ async def waha_webhook(
         raise HTTPException(status_code=500, detail=f"Error processing webhook: {str(e)}")
 
 
-async def handle_message_event(webhook_data: WahaWebhookRequest, db: AsyncSession):
+async def handle_message_event(webhook_data: WahaWebhookRequest, db: AsyncSession, background_tasks: BackgroundTasks):
     """
     Handle incoming message events from WAHA.
 
     Args:
         webhook_data: The webhook data containing the message payload
         db: Database session
+        background_tasks: FastAPI background tasks
     """
     payload = webhook_data.payload
 
@@ -78,7 +80,7 @@ async def handle_message_event(webhook_data: WahaWebhookRequest, db: AsyncSessio
 
     # Use webhook service to handle the message
     webhook_service = WebhookService(db)
-    await webhook_service.handle_incoming_message(webhook_data)
+    await webhook_service.handle_incoming_message(webhook_data, background_tasks)
 
     if payload.hasMedia and payload.media:
         logger.info(f"Message contains media: {payload.media.mimetype}")

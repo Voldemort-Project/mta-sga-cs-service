@@ -142,3 +142,44 @@ class WahaService:
         )
 
         return await self.send_text_message(phone_number, auto_reply_text)
+
+    async def send_typing_indicator(self, phone_number: str) -> dict:
+        """
+        Send typing indicator to guest.
+
+        Args:
+            phone_number: Guest's phone number
+
+        Returns:
+            Response from WAHA API
+        """
+        chat_id = self._format_phone_number(phone_number)
+        url = f"{self.base_url}/api/startTyping"
+        payload = {
+            "chatId": chat_id,
+            "session": self.session
+        }
+        headers = {}
+        if self.api_key:
+            headers["x-api-key"] = self.api_key
+
+        logger.info(f"Sending typing indicator to {chat_id}")
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(url, json=payload, headers=headers)
+                response.raise_for_status()
+
+                result = response.json()
+                logger.info(f"Message sent indicator typing successfully to {chat_id}")
+                return result
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error sending message to {chat_id}: {e.response.status_code} - {e.response.text}")
+            raise Exception(f"Failed to send message: {e.response.status_code}")
+        except httpx.RequestError as e:
+            logger.error(f"Request error sending message to {chat_id}: {str(e)}")
+            raise Exception(f"Failed to connect to WAHA service: {str(e)}")
+        except Exception as e:
+            logger.error(f"Unexpected error sending message to {chat_id}: {str(e)}")
+            raise
