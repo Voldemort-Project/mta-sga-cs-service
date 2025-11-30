@@ -26,3 +26,4 @@ class Room(Base):
 
     # Relationships
     organization = relationship("Organization", back_populates="rooms")
+    checkin_rooms = relationship("CheckinRoom", back_populates="room", foreign_keys="CheckinRoom.room_id")

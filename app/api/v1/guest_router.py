@@ -162,7 +162,7 @@ async def list_guests(
     response_model=StandardResponse[GuestCheckoutResponse],
     status_code=status.HTTP_200_OK,
     summary="Checkout Guest",
-    description="Checkout a guest by terminating their session. All orders must be completed first."
+    description="Checkout a guest by terminating their session (if exists). All orders must be completed first."
 )
 async def checkout_guest(
     guest_id: uuid.UUID = Path(..., description="Guest user ID to checkout"),
@@ -174,7 +174,8 @@ async def checkout_guest(
 
     This endpoint will:
     - Verify that all guest orders are completed (status not pending, assigned, or in_progress)
-    - Terminate the guest's active session
+    - Terminate the guest's active session (if exists, otherwise skip this step)
+    - Update room status to not booked
     - Return checkout confirmation
 
     Args:
@@ -183,11 +184,11 @@ async def checkout_guest(
         db: Database session dependency
 
     Returns:
-        StandardResponse[GuestCheckoutResponse]: Checkout confirmation with session details
+        StandardResponse[GuestCheckoutResponse]: Checkout confirmation with optional session details
 
     Raises:
         400: Guest has incomplete orders
-        404: Guest not found or active session not found
+        404: Guest not found
         500: Internal server error
     """
     service = GuestService(db)
@@ -197,7 +198,7 @@ async def checkout_guest(
     checkout_data = result.data
     checkout_response = GuestCheckoutResponse(
         guest_id=uuid.UUID(checkout_data["guest_id"]),
-        session_id=uuid.UUID(checkout_data["session_id"]),
+        session_id=uuid.UUID(checkout_data["session_id"]) if checkout_data.get("session_id") else None,
         status=checkout_data["status"],
         session_terminated_at=checkout_data.get("session_terminated_at"),
         session_duration_seconds=checkout_data.get("session_duration_seconds")

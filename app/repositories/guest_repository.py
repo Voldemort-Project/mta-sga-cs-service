@@ -326,34 +326,40 @@ class GuestRepository:
     def get_guests_query(self, org_id: UUID) -> Select:
         """Get base query for guests filtered by organization
 
-        Query starts from checkin_rooms table, then joins to users and roles.
-        Uses sessions table to link checkin_rooms to guest users.
+        Query starts from checkin_rooms table, joins directly to users and roles.
+        Session join is removed since sessions are only created after guest sends WhatsApp message.
+        CheckinRoom and Session data will be loaded via selectinload (separate queries).
+        Sessions will be filtered to status='open' at service layer.
 
         Args:
             org_id: Organization ID to filter guests
 
         Returns:
-            SQLAlchemy Select query for guests with guest role in the organization
+            SQLAlchemy Select query for guests with guest role in the organization,
+            with checkin_rooms and sessions relationships eagerly loaded
         """
+        from sqlalchemy.orm import selectinload
+
         # Start from checkin_rooms table
-        # Join to sessions to get guest user (session.session_id = guest_user.id)
-        # Join to users to get user details
+        # Join directly to users via guest_id (no session required)
         # Join to roles to filter only guest role
-        # Use distinct() to avoid duplicate users if they have multiple check-ins
+        # Allow duplicate users if they have multiple check-ins (same user can check-in multiple times)
+        # Use selectinload for collection relationships (more efficient and doesn't require .unique())
         query = (
             select(User)
             .select_from(CheckinRoom)
-            .join(Session, CheckinRoom.id == Session.checkin_room_id)
-            .join(User, Session.session_id == User.id)
+            .join(User, CheckinRoom.guest_id == User.id)
             .join(Role, User.role_id == Role.id)
+            .options(
+                selectinload(User.checkin_rooms).selectinload(CheckinRoom.room),
+                selectinload(User.sessions)
+            )
             .where(
                 CheckinRoom.org_id == org_id,
                 CheckinRoom.deleted_at.is_(None),
-                Session.deleted_at.is_(None),
                 Role.code == "guest",
                 User.deleted_at.is_(None)
             )
-            .distinct()
         )
         return query
 
@@ -443,3 +449,32 @@ class GuestRepository:
 
         await self.db.flush()
         return session
+
+    async def update_checkin_checkout(
+        self,
+        checkin_room_id: UUID,
+        checkout_date: date,
+        checkout_time: time,
+        status: str = "checkout"
+    ) -> Optional[CheckinRoom]:
+        """Update checkin room with checkout information
+
+        Args:
+            checkin_room_id: CheckinRoom ID to update
+            checkout_date: Checkout date
+            checkout_time: Checkout time
+            status: Status to set (default: "checkout")
+
+        Returns:
+            Updated CheckinRoom object or None if not found
+        """
+        checkin_room = await self.get_checkin_room_by_id(checkin_room_id)
+        if not checkin_room:
+            return None
+
+        checkin_room.checkout_date = checkout_date
+        checkin_room.checkout_time = checkout_time
+        checkin_room.status = status
+
+        await self.db.flush()
+        return checkin_room

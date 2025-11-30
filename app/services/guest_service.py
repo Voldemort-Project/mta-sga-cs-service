@@ -160,18 +160,31 @@ class GuestService:
             search_fields=["name", "email", "mobile_phone"]
         )
 
-        # Convert User objects to GuestListItem
-        guest_items = [
-            GuestListItem(
-                id=user.id,
-                name=user.name,
-                email=user.email,
-                mobile_phone=user.mobile_phone,
-                created_at=user.created_at,
-                updated_at=user.updated_at
-            )
-            for user in result.data
-        ]
+        # Convert User objects to GuestListItem (with checkin_rooms and filtered sessions)
+        from app.models.session import SessionStatus
+
+        guest_items = []
+        for user in result.data:
+            # Filter sessions to only include 'open' status
+            open_sessions = [
+                session for session in user.sessions
+                if session.status == SessionStatus.open and session.deleted_at is None
+            ]
+
+            # Create dict from user and override sessions with filtered list
+            user_dict = {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "mobile_phone": user.mobile_phone,
+                "created_at": user.created_at,
+                "updated_at": user.updated_at,
+                "checkin_rooms": user.checkin_rooms,
+                "sessions": open_sessions
+            }
+
+            guest_items.append(GuestListItem.model_validate(user_dict))
+
 
         # Return standard response with pagination
         return create_paginated_response(
@@ -186,14 +199,15 @@ class GuestService:
         guest_id: UUID
     ) -> StandardResponse[dict]:
         """
-        Checkout a guest by terminating their session
+        Checkout a guest by terminating their session (if exists)
 
         This method will:
         1. Check if guest has any incomplete orders (pending, assigned, in_progress)
         2. If incomplete orders exist, raise an error
-        3. Get the active session for the guest
-        4. Terminate the session
-        5. Return success response
+        3. Get the active session for the guest (optional)
+        4. If session exists, terminate it
+        5. Update room status to not booked
+        6. Return success response
 
         Args:
             guest_id: Guest user ID to checkout
@@ -202,7 +216,7 @@ class GuestService:
             StandardResponse[dict]: Success response with checkout details
 
         Raises:
-            ComposeError: If guest not found, incomplete orders exist, or session not found
+            ComposeError: If guest not found or incomplete orders exist
         """
         # Check if guest exists
         guest = await self.repository.get_user_by_id(guest_id)
@@ -223,44 +237,67 @@ class GuestService:
                 http_status_code=status.HTTP_400_BAD_REQUEST
             )
 
-        # Get active session for the guest
+        # Get active session for the guest (optional)
         session = await self.repository.get_active_session_by_user_id(guest_id)
-        if not session:
-            raise ComposeError(
-                error_code=ErrorCode.Guest.SESSION_NOT_FOUND,
-                message=f"Active session not found for guest {guest_id}",
-                http_status_code=status.HTTP_404_NOT_FOUND
-            )
 
         try:
-            # Terminate the session
-            terminated_session = await self.repository.terminate_session(session.id)
-            if not terminated_session:
+            session_id = None
+            session_terminated_at = None
+            session_duration_seconds = None
+
+            # 1. Get active checkin by guest_id
+            active_checkin = await self.repository.get_active_checkin_by_guest_id(guest_id)
+            if not active_checkin:
                 raise ComposeError(
-                    error_code=ErrorCode.Guest.SESSION_NOT_FOUND,
-                    message=f"Failed to terminate session {session.id}",
+                    error_code=ErrorCode.Guest.GUEST_NOT_FOUND,
+                    message=f"No active checkin found for guest {guest_id}",
                     http_status_code=status.HTTP_404_NOT_FOUND
                 )
 
-            # Get checkin room to find the room_id
-            checkin_room = await self.repository.get_checkin_room_by_id(session.checkin_room_id)
-            if checkin_room and checkin_room.room_id:
-                # Update room status to not booked
-                await self.repository.update_room_booked_status(checkin_room.room_id, False)
-                logger.info(f"Room {checkin_room.room_id} status updated to not booked for guest {guest_id}")
+            # 2. Update checkin with checkout information
+            current_date = datetime.now().date()
+            current_time = datetime.now().time()
+            updated_checkin = await self.repository.update_checkin_checkout(
+                checkin_room_id=active_checkin.id,
+                checkout_date=current_date,
+                checkout_time=current_time,
+                status="checkout"
+            )
+            if updated_checkin:
+                logger.info(f"Checkin {active_checkin.id} updated with checkout information for guest {guest_id}")
+
+            # 3. Update room status to not booked
+            if active_checkin.room_id:
+                await self.repository.update_room_booked_status(active_checkin.room_id, False)
+                logger.info(f"Room {active_checkin.room_id} status updated to not booked for guest {guest_id}")
+
+            # 4. If session exists, terminate it
+            if session:
+                terminated_session = await self.repository.terminate_session(session.id)
+                if terminated_session:
+                    session_id = str(terminated_session.id)
+                    session_terminated_at = terminated_session.end.isoformat() if terminated_session.end else None
+                    session_duration_seconds = terminated_session.duration
+                    logger.info(f"Session {session.id} terminated for guest {guest_id}")
+                else:
+                    logger.warning(f"Failed to terminate session {session.id} for guest {guest_id}")
+            else:
+                logger.info(f"No active session found for guest {guest_id}, skipping session termination")
 
             # Commit transaction
             await self.db.commit()
-            logger.info(f"Guest {guest_id} checked out successfully. Session {session.id} terminated.")
+            logger.info(f"Guest {guest_id} checked out successfully")
 
             # Return success response
             return create_success_response(
                 data={
                     "guest_id": str(guest_id),
-                    "session_id": str(terminated_session.id),
+                    "session_id": session_id,
                     "status": "checked_out",
-                    "session_terminated_at": terminated_session.end.isoformat() if terminated_session.end else None,
-                    "session_duration_seconds": terminated_session.duration
+                    "checkout_date": current_date.isoformat(),
+                    "checkout_time": current_time.isoformat(),
+                    "session_terminated_at": session_terminated_at,
+                    "session_duration_seconds": session_duration_seconds
                 },
                 message="Guest checked out successfully"
             )
