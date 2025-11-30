@@ -7,6 +7,7 @@ from typing import Optional
 from app.core.config import settings
 from app.core.exceptions import ComposeError
 from app.constants.error_codes import ErrorCode
+from app.constants.api_paths import APIPath
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +179,83 @@ class H2HAgentRouterService:
             raise ComposeError(
                 error_code=ErrorCode.H2H.UNEXPECTED_ERROR,
                 message="An unexpected error occurred while sending chat message via H2H Agent Router",
+                http_status_code=500,
+                original_error=e
+            )
+
+    async def create_memory_block(
+        self,
+        user_id: UUID
+    ) -> dict:
+        """
+        Create memory block via H2H Agent Router API.
+
+        Args:
+            user_id: User ID (UUID) to use as identifier_id
+
+        Returns:
+            Response from H2H Agent Router API
+
+        Raises:
+            ComposeError: If memory block creation fails
+        """
+        url = f"{self.base_url}{APIPath.H2H_MEMORY_BLOCKS_CREATE}"
+
+        payload = {
+            "identifier_id": str(user_id)
+        }
+
+        # Prepare headers with API key if configured
+        headers = {
+            "Content-Type": "application/json"
+        }
+        if self.api_key:
+            headers["x-api-key"] = self.api_key
+
+        logger.info(f"Creating memory block via H2H Agent Router for user {user_id}")
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(url, json=payload, headers=headers)
+
+                # Log response for debugging
+                logger.debug(f"H2H Agent Router response status: {response.status_code}")
+                logger.debug(f"H2H Agent Router response body: {response.text}")
+
+                # Raise exception for HTTP errors
+                response.raise_for_status()
+
+                result = response.json()
+                logger.info(f"Memory block created successfully for user {user_id}")
+                return result
+
+        except httpx.HTTPStatusError as e:
+            error_msg = f"H2H Agent Router returned {e.response.status_code}"
+            if e.response.text:
+                error_msg += f": {e.response.text}"
+
+            logger.error(f"HTTP error creating memory block for user {user_id}: {error_msg}")
+            raise ComposeError(
+                error_code=ErrorCode.H2H.AGENT_CREATION_FAILED,
+                message=f"Failed to create memory block via H2H Agent Router: {error_msg}",
+                http_status_code=e.response.status_code,
+                original_error=e
+            )
+        except httpx.RequestError as e:
+            error_msg = f"Failed to connect to H2H Agent Router: {str(e)}"
+            logger.error(f"Request error creating memory block for user {user_id}: {error_msg}")
+            raise ComposeError(
+                error_code=ErrorCode.H2H.CONNECTION_FAILED,
+                message=error_msg,
+                http_status_code=500,
+                original_error=e
+            )
+        except Exception as e:
+            error_msg = f"Unexpected error creating memory block for user {user_id}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise ComposeError(
+                error_code=ErrorCode.H2H.UNEXPECTED_ERROR,
+                message="An unexpected error occurred while creating memory block via H2H Agent Router",
                 http_status_code=500,
                 original_error=e
             )

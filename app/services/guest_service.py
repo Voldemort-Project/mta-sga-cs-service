@@ -15,6 +15,7 @@ from app.schemas.guest import GuestRegisterRequest, GuestRegisterResponse, Guest
 from app.schemas.room import RoomListItem
 from app.schemas.response import StandardResponse, create_paginated_response, create_success_response
 from app.models.user import User
+from app.integrations.h2h.h2h_service import H2HAgentRouterService
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,18 @@ class GuestService:
                     phone=request.phone_number,
                     role_id=guest_role.id,
                     org_id=org_id
+                )
+
+            # Create memory block for user via H2H Agent Router
+            try:
+                h2h_service = H2HAgentRouterService()
+                await h2h_service.create_memory_block(user.id)
+                logger.info(f"Memory block created successfully for user {user.id}")
+            except Exception as e:
+                # Log error but don't fail registration - memory block creation is not critical
+                logger.warning(
+                    f"Failed to create memory block for user {user.id}: {str(e)}",
+                    exc_info=True
                 )
 
             # Create check-in with current time
