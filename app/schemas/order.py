@@ -84,7 +84,7 @@ class OrderListItem(BaseModel):
     order_number: str = Field(..., description="Order number")
     order_date: Optional[date] = Field(None, description="Order date")
     order_status: Optional[OrderStatus] = Field(None, description="Order status")
-    category: str = Field(..., description="Order category")
+    category: Optional[str] = Field(None, description="Order category")
     note: Optional[str] = Field(None, description="Order notes")
     additional_note: Optional[str] = Field(None, description="Additional order notes")
     total_amount: Optional[float] = Field(None, description="Total amount")
