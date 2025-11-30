@@ -103,6 +103,93 @@ class H2HAgentRouterService:
                 original_error=e
             )
 
+    async def check_agent_available(
+        self,
+        session_id: UUID
+    ) -> bool:
+        """
+        Check if agent is available for the given session.
+
+        Args:
+            session_id: Session ID (UUID) to check agent availability
+
+        Returns:
+            True if agent is available, False otherwise
+
+        Raises:
+            ComposeError: If checking agent availability fails
+        """
+        url = f"{self.base_url}{APIPath.H2H_AGENT_AVAILABLE}"
+
+        payload = {
+            "identifier_id": str(session_id),
+            "conversation_id": str(session_id)
+        }
+
+        # Prepare headers with API key if configured
+        headers = {
+            "Content-Type": "application/json"
+        }
+        if self.api_key:
+            headers["x-api-key"] = self.api_key
+
+        logger.info(f"Checking agent availability for session {session_id}")
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(url, json=payload, headers=headers)
+
+                # Log response for debugging
+                logger.debug(f"H2H Agent Router response status: {response.status_code}")
+                logger.debug(f"H2H Agent Router response body: {response.text}")
+
+                # Raise exception for HTTP errors
+                response.raise_for_status()
+
+                result = response.json()
+
+                # Extract agent availability from response
+                # Response format: { "message": "...", "data": { "agent": boolean } }
+                agent_available = False
+                if isinstance(result, dict):
+                    data = result.get("data")
+                    if isinstance(data, dict):
+                        agent_available = data.get("agent", False)
+
+                logger.info(f"Agent availability for session {session_id}: {agent_available}")
+                return agent_available
+
+        except httpx.HTTPStatusError as e:
+            error_msg = f"H2H Agent Router returned {e.response.status_code}"
+            if e.response.text:
+                error_msg += f": {e.response.text}"
+
+            logger.error(f"HTTP error checking agent availability for session {session_id}: {error_msg}")
+            raise ComposeError(
+                error_code=ErrorCode.H2H.AGENT_CREATION_FAILED,
+                message=f"Failed to check agent availability via H2H Agent Router: {error_msg}",
+                http_status_code=e.response.status_code,
+                original_error=e
+            )
+        except httpx.RequestError as e:
+            error_msg = f"Failed to connect to H2H Agent Router: {str(e)}"
+            logger.error(f"Request error checking agent availability for session {session_id}: {error_msg}")
+            raise ComposeError(
+                error_code=ErrorCode.H2H.CONNECTION_FAILED,
+                message=error_msg,
+                http_status_code=500,
+                original_error=e
+            )
+        except Exception as e:
+            error_msg = f"Unexpected error checking agent availability for session {session_id}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise ComposeError(
+                error_code=ErrorCode.H2H.UNEXPECTED_ERROR,
+                message="An unexpected error occurred while checking agent availability via H2H Agent Router",
+                http_status_code=500,
+                original_error=e
+            )
+
     async def send_chat_message(
         self,
         session_id: UUID,

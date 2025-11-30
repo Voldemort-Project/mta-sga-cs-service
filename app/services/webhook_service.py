@@ -151,6 +151,25 @@ class WebhookService:
             logger.error(f"Failed to send H2H message or forward response for session {session_id}: {str(e)}")
             # Don't fail - this is a background task
 
+    async def _check_agent_available(self, session_id: UUID) -> bool:
+        """
+        Check if agent is available for the given session.
+
+        Args:
+            session_id: Session ID to check
+
+        Returns:
+            True if agent is available, False otherwise
+        """
+        try:
+            agent_available = await self.h2h_service.check_agent_available(session_id)
+            logger.info(f"Agent availability check for session {session_id}: {agent_available}")
+            return agent_available
+        except Exception as e:
+            logger.error(f"Failed to check agent availability for session {session_id}: {str(e)}")
+            # Return False if check fails - safer to assume agent is not ready
+            return False
+
     async def _create_agent_with_category(self, session_id: UUID, category: str) -> bool:
         """
         Create agent via H2H with specified category.
@@ -416,7 +435,33 @@ class WebhookService:
                     )
                     logger.info(f"User {user.id} sent invalid command, reminded to select category")
             else:
-                # Agent already created - normal conversation flow
+                # Agent already created - check if agent is actually available
+                agent_available = await self._check_agent_available(session.id)
+
+                if not agent_available:
+                    # Agent not available yet - send waiting message
+                    waiting_text = (
+                        "Asisten anda sedang di persiapkan. Silahkan coba beberapa saat lagi."
+                    )
+
+                    # Save waiting message
+                    await self.repository.create_message(
+                        session_id=session.id,
+                        role=MessageRole.System,
+                        text=waiting_text
+                    )
+                    await self.db.commit()
+
+                    # Send waiting message via WAHA
+                    waha_phone = format_phone_international_id(phone_number)
+                    await self.waha_service.send_text_message(
+                        phone_number=waha_phone,
+                        text=waiting_text
+                    )
+                    logger.info(f"Agent not available for session {session.id}, sent waiting message to {phone_number}")
+                    return
+
+                # Agent is available - normal conversation flow
                 # Send typing indicator only
                 try:
                     waha_phone = format_phone_international_id(phone_number)
