@@ -76,14 +76,14 @@ async def list_orders(
 
 
 @router.post(
-    "/{order_id}/assign-worker",
+    "/{order_number}/assign-worker",
     response_model=StandardResponse[OrderAssignerResponse],
     status_code=status.HTTP_201_CREATED,
     summary="Assign Order to Worker",
     description="Assign an order to a worker. Worker can only handle maximum 5 active orders at a time."
 )
 async def assign_order_to_worker(
-    order_id: uuid.UUID = Path(..., description="Order ID to assign"),
+    order_number: str = Path(..., description="Order number to assign"),
     request: AssignOrderRequest = ...,
     current_user: TokenData = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
@@ -105,7 +105,7 @@ async def assign_order_to_worker(
     - Order status will be updated to "assigned" if it's currently "pending"
 
     Args:
-        order_id: Order ID to assign
+        order_number: Order number to assign (e.g., "ORD-001")
         request: Request body containing worker_id
         current_user: Current authenticated user (from token)
         db: Database session dependency
@@ -121,7 +121,7 @@ async def assign_order_to_worker(
     """
     service = OrderAssignerService(db)
     return await service.assign_order_to_worker(
-        order_id=order_id,
+        order_number=order_number,
         worker_id=request.worker_id
     )
 

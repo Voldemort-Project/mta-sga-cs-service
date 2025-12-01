@@ -11,6 +11,7 @@ from sqlalchemy import select
 from app.repositories.guest_repository import GuestRepository
 from app.models.session import Session
 from app.models.user import User
+from app.models.checkin import CheckinRoom
 from app.models.order_item import OrderItem
 from app.schemas.webhook import OrderWebhookRequest, OrderRequest
 from app.core.exceptions import ComposeError
@@ -70,12 +71,28 @@ class OrderWebhookService:
 
         guest_id = session.session_id
 
-        # Get org_id from guest user if available
-        guest = await self.db.execute(
-            select(User).where(User.id == guest_id)
+        # Get org_id from checkin_room.org_id
+        if not session.checkin_room_id:
+            raise ComposeError(
+                error_code=ErrorCode.General.BAD_REQUEST,
+                message=f"Session {request.session_id} does not have an associated checkin_room",
+                http_status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get checkin_room to retrieve org_id
+        checkin_room = await self.db.execute(
+            select(CheckinRoom).where(CheckinRoom.id == session.checkin_room_id)
         )
-        guest_obj = guest.scalar_one_or_none()
-        org_id = guest_obj.org_id if guest_obj else None
+        checkin_room_obj = checkin_room.scalar_one_or_none()
+
+        if not checkin_room_obj:
+            raise ComposeError(
+                error_code=ErrorCode.General.NOT_FOUND,
+                message=f"CheckinRoom not found with ID: {session.checkin_room_id}",
+                http_status_code=status.HTTP_404_NOT_FOUND
+            )
+
+        org_id = checkin_room_obj.org_id
 
         try:
             created_order_numbers = []

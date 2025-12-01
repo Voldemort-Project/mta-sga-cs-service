@@ -61,6 +61,23 @@ class OrderAssignerRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_order_by_order_number(self, order_number: str) -> Optional[Order]:
+        """Get order by order number
+
+        Args:
+            order_number: Order number
+
+        Returns:
+            Order object or None
+        """
+        result = await self.db.execute(
+            select(Order).where(
+                Order.order_number == order_number,
+                Order.deleted_at.is_(None)
+            )
+        )
+        return result.scalar_one_or_none()
+
     async def get_user_by_id(self, user_id: UUID) -> Optional[User]:
         """Get user by ID
 

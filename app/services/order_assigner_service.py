@@ -28,7 +28,7 @@ class OrderAssignerService:
 
     async def assign_order_to_worker(
         self,
-        order_id: UUID,
+        order_number: str,
         worker_id: UUID
     ) -> StandardResponse[OrderAssignerResponse]:
         """
@@ -42,7 +42,7 @@ class OrderAssignerService:
         - Order cannot be already assigned to the same worker
 
         Args:
-            order_id: Order ID to assign
+            order_number: Order number to assign
             worker_id: Worker (user) ID to assign the order to
 
         Returns:
@@ -53,13 +53,16 @@ class OrderAssignerService:
         """
         try:
             # Check if order exists
-            order = await self.repository.get_order_by_id(order_id)
+            order = await self.repository.get_order_by_order_number(order_number)
             if not order:
                 raise ComposeError(
                     error_code=ErrorCode.OrderAssigner.ORDER_NOT_FOUND,
                     message="Order not found",
                     http_status_code=status.HTTP_404_NOT_FOUND
                 )
+
+            # Get order_id from the order object
+            order_id = order.id
 
             # Check if worker exists
             worker = await self.repository.get_user_by_id(worker_id)
