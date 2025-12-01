@@ -211,6 +211,23 @@ class OrderRepository:
             await self.db.refresh(order)
         return order
 
+    async def update_order_status_by_order_number(self, order_number: str, status) -> Optional[Order]:
+        """Update order status by order number
+
+        Args:
+            order_number: Order number
+            status: New order status (OrderStatus enum)
+
+        Returns:
+            Updated Order object or None if order not found
+        """
+        order = await self.get_order_by_order_number(order_number)
+        if order:
+            order.status = status
+            await self.db.commit()
+            await self.db.refresh(order)
+        return order
+
     async def get_session_by_id(self, session_id: UUID) -> Optional[Session]:
         """Get session by ID
 

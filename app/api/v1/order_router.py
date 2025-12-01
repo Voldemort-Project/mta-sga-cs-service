@@ -204,3 +204,46 @@ async def update_order_status(
         order_id=order_id,
         new_status=request.status
     )
+
+
+@router.patch(
+    "/{order_number}/status",
+    response_model=StandardResponse[UpdateOrderStatusResponse],
+    status_code=status.HTTP_200_OK,
+    summary="Update Order Status by Order Number",
+    description="Update the status of an order using order number"
+)
+async def update_order_status_by_order_number(
+    order_number: str = Path(..., description="Order number to update"),
+    request: UpdateOrderStatusRequest = ...,
+    current_user: TokenData = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+) -> StandardResponse[UpdateOrderStatusResponse]:
+    """
+    Update the status of an order by order number.
+
+    This endpoint will:
+    - Validate that the order exists
+    - Update the order status to the new status
+    - Return the updated order information
+
+    Args:
+        order_number: Order number to update (e.g., "ORD-001")
+        request: Request body containing the new status
+        current_user: Current authenticated user (from token)
+        db: Database session dependency
+
+    Returns:
+        StandardResponse[UpdateOrderStatusResponse]: Updated order information
+
+    Raises:
+        404: Order not found
+        400: Invalid status
+        401: Unauthorized (if token is invalid)
+        500: Internal server error
+    """
+    service = OrderService(db)
+    return await service.update_order_status_by_order_number(
+        order_number=order_number,
+        new_status=request.status
+    )

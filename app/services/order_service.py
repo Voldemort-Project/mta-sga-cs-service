@@ -240,6 +240,68 @@ class OrderService:
                 original_error=e
             )
 
+    async def update_order_status_by_order_number(
+        self,
+        order_number: str,
+        new_status: OrderStatus
+    ) -> StandardResponse[UpdateOrderStatusResponse]:
+        """
+        Update order status by order number
+
+        Args:
+            order_number: Order number to update
+            new_status: New order status
+
+        Returns:
+            StandardResponse[UpdateOrderStatusResponse]: Standard response with updated order information
+
+        Raises:
+            ComposeError: If order not found or update fails
+        """
+        try:
+            # Get order by order number
+            order = await self.repository.get_order_by_order_number(order_number)
+            if not order:
+                raise ComposeError(
+                    error_code=ErrorCode.Order.ORDER_NOT_FOUND,
+                    message=f"Order with order number {order_number} not found.",
+                    http_status_code=status.HTTP_404_NOT_FOUND
+                )
+
+            # Update order status
+            updated_order = await self.repository.update_order_status_by_order_number(order_number, new_status)
+            if not updated_order:
+                raise ComposeError(
+                    error_code=ErrorCode.Order.UPDATE_STATUS_FAILED,
+                    message="Failed to update order status. Please try again or contact support.",
+                    http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+            # Build response
+            response_data = UpdateOrderStatusResponse(
+                id=updated_order.id,
+                order_number=updated_order.order_number,
+                status=updated_order.status,
+                updated_at=updated_order.updated_at
+            )
+
+            return create_success_response(
+                data=response_data,
+                message="Order status updated successfully"
+            )
+
+        except ComposeError:
+            # Re-raise ComposeError as-is
+            raise
+        except Exception as e:
+            logger.error(f"Error updating order status by order number: {str(e)}", exc_info=True)
+            raise ComposeError(
+                error_code=ErrorCode.Order.UPDATE_STATUS_FAILED,
+                message="Failed to update order status. Please try again or contact support.",
+                http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                original_error=e
+            )
+
     async def list_orders_by_session(
         self,
         session_id: UUID
