@@ -96,6 +96,7 @@ class OrderCategory(str, Enum):
     room_service = "room_service"
     maintenance = "maintenance"
     concierge = "concierge"
+    restaurant = "restaurant"
 
 
 class OrderItemRequest(BaseModel):

@@ -85,3 +85,45 @@ def format_phone_local_id(phone_number: str) -> str:
     else:
         # If doesn't start with 0 or 62, assume it needs 0 prefix
         return '0' + phone_digits
+
+
+def format_phone_number(phone_number: str) -> str:
+    """
+    Format phone number by removing '+' and replacing leading '0' with '62'.
+
+    Rules:
+    - Remove '+' sign if present
+    - If number starts with '0', replace it with '62'
+    - Otherwise, keep as is
+
+    Args:
+        phone_number: Phone number in various formats
+
+    Returns:
+        Formatted phone number with area code without '+' sign
+
+    Examples:
+        >>> format_phone_number("+62823xxxx")
+        "62823xxxx"
+        >>> format_phone_number("62823xxxx")
+        "62823xxxx"
+        >>> format_phone_number("0823xxxx")
+        "62823xxxx"
+        >>> format_phone_number("+1823xxxx")
+        "1823xxxx"
+        >>> format_phone_number("1823xxxx")
+        "1823xxxx"
+        >>> format_phone_number("021xxxx")
+        "621xxxx"
+    """
+    if not phone_number:
+        return phone_number
+
+    # Remove '+' sign if present
+    formatted = phone_number.replace('+', '')
+
+    # If starts with '0', replace with '62'
+    if formatted.startswith('0'):
+        formatted = '62' + formatted[1:]
+
+    return formatted

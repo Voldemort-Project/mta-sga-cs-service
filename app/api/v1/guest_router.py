@@ -13,7 +13,6 @@ from app.schemas.guest import GuestRegisterRequest, GuestRegisterResponse, Guest
 from app.schemas.room import RoomListItem
 from app.schemas.response import StandardResponse, create_success_response
 from app.services.guest_service import GuestService
-# from app.integrations.h2h import H2HAgentRouterService
 
 logger = logging.getLogger(__name__)
 
@@ -72,29 +71,6 @@ async def register_guest(
         data=result,
         message="Guest registered successfully"
     )
-
-
-# async def create_agent_via_h2h(session_id: uuid.UUID) -> None:
-#     """
-#     Background task to create agent via H2H Agent Router.
-
-#     This function runs asynchronously after the guest registration response is returned.
-#     Errors are logged but do not affect the main registration flow.
-
-#     Args:
-#         session_id: Session ID to use as identifier_id for agent creation
-#     """
-#     try:
-#         h2h_agent_router_service = H2HAgentRouterService()
-#         await h2h_agent_router_service.create_agent(session_id)
-#         logger.info(f"Successfully created agent via H2H Agent Router for session {session_id}")
-#     except Exception as e:
-#         # Log error but don't raise - this is a background task
-#         # The guest registration has already succeeded, so we just log the failure
-#         logger.error(
-#             f"Failed to create agent via H2H Agent Router for session {session_id}: {str(e)}",
-#             exc_info=True
-#         )
 
 
 @router.get(

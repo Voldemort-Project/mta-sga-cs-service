@@ -16,6 +16,7 @@ from app.schemas.room import RoomListItem
 from app.schemas.response import StandardResponse, create_paginated_response, create_success_response
 from app.models.user import User
 from app.integrations.h2h.h2h_service import H2HAgentRouterService
+from app.utils.phone_utils import format_phone_number
 
 logger = logging.getLogger(__name__)
 
@@ -74,20 +75,24 @@ class GuestService:
             )
 
         try:
+            # Format phone number: remove '+' and replace leading '0' with '62'
+            formatted_phone = format_phone_number(request.phone_number)
+            logger.info(f"Formatted phone number from {request.phone_number} to {formatted_phone}")
+
             # Check if user with this phone number already exists
-            existing_user = await self.repository.get_user_by_phone(request.phone_number)
+            existing_user = await self.repository.get_user_by_phone(formatted_phone)
 
             if existing_user:
                 # User has stayed at the hotel before, reuse existing data
-                logger.info(f"Found existing user with phone {request.phone_number}, reusing user data")
+                logger.info(f"Found existing user with phone {formatted_phone}, reusing user data")
                 user = existing_user
             else:
                 # Create new guest user
-                logger.info(f"Creating new guest user with phone {request.phone_number}")
+                logger.info(f"Creating new guest user with phone {formatted_phone}")
                 user = await self.repository.create_guest_user(
                     name=request.full_name,
                     email=request.email,
-                    phone=request.phone_number,
+                    phone=formatted_phone,
                     role_id=guest_role.id,
                     org_id=org_id
                 )
