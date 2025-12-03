@@ -229,7 +229,8 @@ class WebhookService:
         # Format phone number to match database format (with leading 0)
         # Database stores: 081234567890
         # WAHA sends: 6281234567890@c.us
-        phone_number = format_phone_local_id(phone_number)
+
+        # phone_number = format_phone_local_id(phone_number)
 
         logger.info(f"Processing message from {phone_number}: {payload.body}")
 
