@@ -46,7 +46,7 @@ class H2HAgentRouterService:
 
         # Add category to payload if provided
         if category:
-            payload["category"] = category
+            payload["category"] = int(category)
 
         # Prepare headers with API key if configured
         headers = {
