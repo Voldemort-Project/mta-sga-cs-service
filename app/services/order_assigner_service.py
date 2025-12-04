@@ -97,13 +97,14 @@ class OrderAssignerService:
             # Create the assignment
             assignment = await self.repository.create_assignment(
                 order_id=order_id,
-                worker_id=worker_id
+                worker_id=worker_id,
+                status=OrderAssignerStatus.assigned
             )
 
             # Update order status to "assigned" if it's still "pending"
-            if order.status == OrderStatus.pending:
-                order.status = OrderStatus.assigned
-                self.db.add(order)
+            # if order.status == OrderStatus.pending:
+            #     order.status = OrderStatus.assigned
+            #     self.db.add(order)
 
             # Commit transaction
             await self.db.commit()
