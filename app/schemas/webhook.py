@@ -41,7 +41,7 @@ class MessagePayload(BaseModel):
     from_: str = Field(..., alias="from")
     fromMe: bool
     source: Optional[str] = None
-    to: str
+    to: Optional[str] = None
     participant: Optional[str] = None
     body: Optional[str] = None
     hasMedia: bool = False
