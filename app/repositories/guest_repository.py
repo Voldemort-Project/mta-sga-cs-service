@@ -3,7 +3,7 @@ from datetime import datetime, date, time, timezone
 from typing import Optional, List
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
@@ -331,6 +331,8 @@ class GuestRepository:
         CheckinRoom and Session data will be loaded via selectinload (separate queries).
         Sessions will be filtered to status='open' at service layer.
 
+        Uses subquery to get distinct users with their latest checkin_rooms.created_at for ordering.
+
         Args:
             org_id: Organization ID to filter guests
 
@@ -340,27 +342,36 @@ class GuestRepository:
         """
         from sqlalchemy.orm import selectinload
 
-        # Start from checkin_rooms table
-        # Join directly to users via guest_id (no session required)
-        # Join to roles to filter only guest role
-        # Allow duplicate users if they have multiple check-ins (same user can check-in multiple times)
-        # Use selectinload for collection relationships (more efficient and doesn't require .unique())
+        # Subquery to get distinct user_ids with their latest checkin_rooms.created_at
+        # This allows us to order by checkin_rooms.created_at while using DISTINCT
+        subquery = (
+            select(
+                CheckinRoom.guest_id,
+                func.max(CheckinRoom.created_at).label('latest_checkin_created_at')
+            )
+            .where(
+                CheckinRoom.org_id == org_id,
+                CheckinRoom.deleted_at.is_(None)
+            )
+            .group_by(CheckinRoom.guest_id)
+            .subquery()
+        )
+
+        # Main query: select distinct users, join with subquery for ordering
         query = (
             select(User)
-            .select_from(CheckinRoom)
-            .join(User, CheckinRoom.guest_id == User.id)
+            .select_from(subquery)
+            .join(User, subquery.c.guest_id == User.id)
             .join(Role, User.role_id == Role.id)
             .options(
                 selectinload(User.checkin_rooms).selectinload(CheckinRoom.room),
                 selectinload(User.sessions)
             )
             .where(
-                CheckinRoom.org_id == org_id,
-                CheckinRoom.deleted_at.is_(None),
                 Role.code == "guest",
                 User.deleted_at.is_(None)
             )
-            .order_by(CheckinRoom.created_at.desc())
+            .order_by(subquery.c.latest_checkin_created_at.desc())
         )
         return query
 

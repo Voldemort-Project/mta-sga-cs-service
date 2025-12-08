@@ -180,9 +180,12 @@ class GuestService:
 
         # Convert User objects to GuestListItem (with checkin_rooms and filtered sessions)
         # If user has multiple checkin_rooms, create multiple GuestListItem entries (1 per checkin_room)
+        # Use a set to track unique combinations of (user_id, checkin_date, room_id) to avoid duplicates
         from app.models.session import SessionStatus
 
         guest_items = []
+        seen_combinations = set()  # Track (user_id, checkin_date, room_id) to avoid duplicates
+
         for user in result.data:
             # Filter sessions to only include 'open' status
             open_sessions = [
@@ -190,10 +193,10 @@ class GuestService:
                 if session.status == SessionStatus.open and session.deleted_at is None
             ]
 
-            # Filter checkin_rooms to only include non-deleted ones
+            # Filter checkin_rooms to only include non-deleted ones and filter by org_id
             active_checkin_rooms = [
                 checkin_room for checkin_room in user.checkin_rooms
-                if checkin_room.deleted_at is None
+                if checkin_room.deleted_at is None and checkin_room.org_id == org_id
             ]
 
             # If user has no checkin_rooms, skip (shouldn't happen but safety check)
@@ -202,6 +205,18 @@ class GuestService:
 
             # Create one GuestListItem per checkin_room
             for checkin_room in active_checkin_rooms:
+                # Create unique key: (user_id, checkin_date, room_id)
+                # This ensures we don't create duplicate entries for same checkin_date + room combination
+                checkin_date = checkin_room.checkin_date
+                room_id = checkin_room.room_id
+                unique_key = (str(user.id), str(checkin_date) if checkin_date else None, str(room_id) if room_id else None)
+
+                # Skip if we've already seen this combination
+                if unique_key in seen_combinations:
+                    continue
+
+                seen_combinations.add(unique_key)
+
                 # Create dict from user and override checkin_rooms with single item
                 user_dict = {
                     "id": user.id,
