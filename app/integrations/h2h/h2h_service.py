@@ -15,6 +15,13 @@ logger = logging.getLogger(__name__)
 class H2HAgentRouterService:
     """Service for interacting with H2H (Host-to-Host) Agent Router API"""
 
+    # Category mapping: string category -> integer for H2H API
+    CATEGORY_MAP = {
+        "general_information": 1,
+        "room_service": 2,
+        "customer_service": 3
+    }
+
     def __init__(self):
         self.base_url = settings.h2h_agent_router_host
         self.agent_router_path = settings.h2h_agent_router_path
@@ -23,6 +30,7 @@ class H2HAgentRouterService:
     async def create_agent(
         self,
         session_id: UUID,
+        user_id: UUID,
         category: Optional[str] = None
     ) -> dict:
         """
@@ -41,12 +49,22 @@ class H2HAgentRouterService:
         url = f"{self.base_url}{self.agent_router_path}"
 
         payload = {
-            "identifier_id": str(session_id)
+            "identifier_id": str(user_id),
+            "conversation_id": str(session_id)
         }
 
         # Add category to payload if provided
         if category:
-            payload["category"] = int(category)
+            # Map string category to integer for H2H API
+            # If category is already a numeric string, convert directly
+            # Otherwise, use the category mapping
+            if category.isdigit():
+                payload["category"] = int(category)
+            elif category in self.CATEGORY_MAP:
+                payload["category"] = self.CATEGORY_MAP[category]
+            else:
+                # If category is not recognized, log warning and skip
+                logger.warning(f"Unknown category '{category}' for session {session_id}, skipping category in payload")
 
         # Prepare headers with API key if configured
         headers = {
@@ -137,7 +155,7 @@ class H2HAgentRouterService:
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(url, json=payload, headers=headers)
+                response = await client.get(url, params=payload, headers=headers)
 
                 # Log response for debugging
                 logger.debug(f"H2H Agent Router response status: {response.status_code}")
@@ -193,6 +211,7 @@ class H2HAgentRouterService:
     async def send_chat_message(
         self,
         session_id: UUID,
+        user_id: UUID,
         content: str
     ) -> dict:
         """
@@ -208,10 +227,11 @@ class H2HAgentRouterService:
         Raises:
             ComposeError: If sending message fails
         """
-        url = f"{self.base_url}/v2/chats"
+        url = f"{self.base_url}{APIPath.H2H_CHAT_MESSAGE}"
 
         payload = {
-            "session_id": str(session_id),
+            "conversation_id": str(session_id),
+            "identifier_id": str(user_id),
             "content": content
         }
 

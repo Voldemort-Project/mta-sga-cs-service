@@ -104,7 +104,7 @@ class WebhookService:
 
         return category_map.get(message_text)
 
-    async def _send_h2h_message_background(self, session_id: UUID, message: str, phone_number: str) -> None:
+    async def _send_h2h_message_background(self, session_id: UUID, user_id: UUID, message: str, phone_number: str) -> None:
         """
         Send message to H2H service in background and forward response to guest via WAHA.
         This method is run as a background task.
@@ -116,7 +116,7 @@ class WebhookService:
         """
         try:
             # Send message to H2H and get response
-            result = await self.h2h_service.send_chat_message(session_id, message)
+            result = await self.h2h_service.send_chat_message(session_id, user_id, message)
             logger.info(f"H2H chat message sent successfully for session {session_id}: {result}")
 
             # Extract reply message from H2H response
@@ -170,7 +170,7 @@ class WebhookService:
             # Return False if check fails - safer to assume agent is not ready
             return False
 
-    async def _create_agent_with_category(self, session_id: UUID, category: str) -> bool:
+    async def _create_agent_with_category(self, session_id: UUID, user_id: UUID, category: str) -> bool:
         """
         Create agent via H2H with specified category.
 
@@ -184,6 +184,7 @@ class WebhookService:
         try:
             # Create agent via H2H
             agent_result = await self.h2h_service.create_agent(
+                user_id=user_id,
                 session_id=session_id,
                 category=category
             )
@@ -378,6 +379,7 @@ class WebhookService:
                     # Create agent with selected category
                     agent_created = await self._create_agent_with_category(
                         session_id=session.id,
+                        user_id=session.session_id,
                         category=category
                     )
 
@@ -477,6 +479,7 @@ class WebhookService:
                 background_tasks.add_task(
                     self._send_h2h_message_background,
                     session.id,
+                    session.session_id,
                     user_message,
                     phone_number
                 )
