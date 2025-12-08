@@ -360,6 +360,7 @@ class GuestRepository:
                 Role.code == "guest",
                 User.deleted_at.is_(None)
             )
+            .order_by(CheckinRoom.created_at.desc())
         )
         return query
 

@@ -179,6 +179,7 @@ class GuestService:
         )
 
         # Convert User objects to GuestListItem (with checkin_rooms and filtered sessions)
+        # If user has multiple checkin_rooms, create multiple GuestListItem entries (1 per checkin_room)
         from app.models.session import SessionStatus
 
         guest_items = []
@@ -189,19 +190,31 @@ class GuestService:
                 if session.status == SessionStatus.open and session.deleted_at is None
             ]
 
-            # Create dict from user and override sessions with filtered list
-            user_dict = {
-                "id": user.id,
-                "name": user.name,
-                "email": user.email,
-                "mobile_phone": user.mobile_phone,
-                "created_at": user.created_at,
-                "updated_at": user.updated_at,
-                "checkin_rooms": user.checkin_rooms,
-                "sessions": open_sessions
-            }
+            # Filter checkin_rooms to only include non-deleted ones
+            active_checkin_rooms = [
+                checkin_room for checkin_room in user.checkin_rooms
+                if checkin_room.deleted_at is None
+            ]
 
-            guest_items.append(GuestListItem.model_validate(user_dict))
+            # If user has no checkin_rooms, skip (shouldn't happen but safety check)
+            if not active_checkin_rooms:
+                continue
+
+            # Create one GuestListItem per checkin_room
+            for checkin_room in active_checkin_rooms:
+                # Create dict from user and override checkin_rooms with single item
+                user_dict = {
+                    "id": user.id,
+                    "name": user.name,
+                    "email": user.email,
+                    "mobile_phone": user.mobile_phone,
+                    "created_at": user.created_at,
+                    "updated_at": user.updated_at,
+                    "checkin_rooms": [checkin_room],  # Only this one checkin_room
+                    "sessions": open_sessions
+                }
+
+                guest_items.append(GuestListItem.model_validate(user_dict))
 
 
         # Return standard response with pagination
