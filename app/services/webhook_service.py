@@ -1,5 +1,6 @@
 """Webhook service for handling WAHA messages"""
 import logging
+import httpx
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from uuid import UUID
@@ -13,6 +14,7 @@ from app.integrations.waha import WahaService
 from app.integrations.h2h import H2HAgentRouterService
 from app.schemas.webhook import WahaWebhookRequest
 from app.core.exceptions import ComposeError
+from app.core.config import settings
 from app.constants.error_codes import ErrorCode
 from app.utils.phone_utils import format_phone_international_id, format_phone_local_id
 
@@ -27,6 +29,70 @@ class WebhookService:
         self.repository = GuestRepository(db)
         self.waha_service = WahaService()
         self.h2h_service = H2HAgentRouterService()
+
+    def _is_lid_chat_id(self, chat_id: str) -> bool:
+        """
+        Check if chat_id is a LID (Linked ID) type.
+
+        Args:
+            chat_id: WhatsApp chatId (e.g., "1111111@lid", "9281888928@lid")
+
+        Returns:
+            True if chat_id is LID type, False otherwise
+        """
+        return chat_id.endswith("@lid")
+
+    async def _extract_phone_from_lid(self, lid_chat_id: str) -> str:
+        """
+        Extract phone number from LID by calling WAHA API.
+
+        Args:
+            lid_chat_id: LID chatId (e.g., "1111111@lid", "9281888928@lid")
+
+        Returns:
+            Phone number in @c.us format (e.g., "3333333@c.us")
+
+        Raises:
+            Exception: If API call fails or response is invalid
+        """
+        # Extract LID number (remove @lid suffix)
+        lid_number = lid_chat_id.replace("@lid", "")
+
+        # Call WAHA API to get phone number from LID
+        url = f"{settings.waha_host}/api/default/lids/{lid_number}"
+
+        # Prepare headers with API key if configured
+        headers = {}
+        if settings.waha_api_key:
+            headers["x-api-key"] = settings.waha_api_key
+
+        logger.info(f"Extracting phone from LID: {lid_chat_id}")
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(url, headers=headers)
+                response.raise_for_status()
+
+                result = response.json()
+
+                # Extract phone number from response
+                # Response format: { "lid": "1111111@lid", "pn": "3333333@c.us" }
+                phone_number = result.get("pn")
+                if not phone_number:
+                    raise Exception(f"No phone number (pn) found in LID response: {result}")
+
+                logger.info(f"Extracted phone from LID {lid_chat_id}: {phone_number}")
+                return phone_number
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error extracting phone from LID {lid_chat_id}: {e.response.status_code} - {e.response.text}")
+            raise Exception(f"Failed to extract phone from LID: {e.response.status_code}")
+        except httpx.RequestError as e:
+            logger.error(f"Request error extracting phone from LID {lid_chat_id}: {str(e)}")
+            raise Exception(f"Failed to connect to WAHA service for LID extraction: {str(e)}")
+        except Exception as e:
+            logger.error(f"Unexpected error extracting phone from LID {lid_chat_id}: {str(e)}")
+            raise
 
     def _extract_phone_from_chat_id(self, chat_id: str) -> str:
         """
@@ -224,8 +290,17 @@ class WebhookService:
             logger.info(f"Ignoring message from self: {payload.id}")
             return
 
-        # Extract phone number from chatId
-        phone_number = self._extract_phone_from_chat_id(payload.from_)
+        # Check if the chat_id is LID type and extract phone number accordingly
+        chat_id = payload.from_
+        if self._is_lid_chat_id(chat_id):
+            logger.info(f"Detected LID chat_id: {chat_id}")
+            # Extract phone number from LID via API
+            phone_number_with_suffix = await self._extract_phone_from_lid(chat_id)
+            # Extract phone number from the @c.us format
+            phone_number = self._extract_phone_from_chat_id(phone_number_with_suffix)
+        else:
+            # Regular phone number - extract directly
+            phone_number = self._extract_phone_from_chat_id(chat_id)
 
         # Format phone number to match database format (with leading 0)
         # Database stores: 081234567890
