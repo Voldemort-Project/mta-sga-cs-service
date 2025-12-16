@@ -339,7 +339,7 @@ class WebhookService:
 
             time_since_update = current_time - session_updated_at
 
-            if time_since_update > timedelta(minutes=30):
+            if time_since_update > timedelta(minutes=5):
                 logger.info(
                     f"Session {session.id} expired (last updated: {time_since_update.total_seconds()/60:.1f} minutes ago), "
                     f"will terminate and create new session"

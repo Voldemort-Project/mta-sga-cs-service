@@ -1,18 +1,19 @@
 """Order webhook service for handling order creation via webhook"""
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 from typing import Optional, List
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.repositories.guest_repository import GuestRepository
 from app.models.session import Session
 from app.models.user import User
 from app.models.checkin import CheckinRoom
 from app.models.order_item import OrderItem
+from app.models.order import Order
 from app.schemas.webhook import OrderWebhookRequest, OrderRequest
 from app.core.exceptions import ComposeError
 from app.constants.error_codes import ErrorCode
@@ -28,16 +29,73 @@ class OrderWebhookService:
         self.db = db
         self.repository = GuestRepository(db)
 
-    def _generate_order_number(self) -> str:
+    async def _get_next_sequence(self) -> int:
         """
-        Generate a unique order number.
+        Get the next sequence number for the current month.
 
         Returns:
-            Unique order number in format: ORD-{timestamp}-{short_uuid}
+            Next sequence number (starts from 1)
         """
-        timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
-        short_uuid = str(uuid.uuid4())[:8].upper()
-        return f"ORD-{timestamp}-{short_uuid}"
+        # Get current year and month in YYMM format (e.g., 2512 for December 2025)
+        now = datetime.now(timezone.utc)
+        yymm = now.strftime("%y%m")
+        prefix = f"ORD-{yymm}-"
+
+        # Query the last order number for the current month
+        # Find orders that start with the current month prefix
+        result = await self.db.execute(
+            select(func.max(Order.order_number))
+            .where(
+                Order.order_number.like(f"{prefix}%"),
+                Order.deleted_at.is_(None)
+            )
+        )
+        last_order_number = result.scalar_one_or_none()
+
+        # Extract sequence from last order number or start from 0
+        if last_order_number:
+            try:
+                # Extract sequence part (last 4 digits after the last dash)
+                sequence_str = last_order_number.split("-")[-1]
+                sequence = int(sequence_str)
+            except (ValueError, IndexError):
+                # If parsing fails, start from 0
+                sequence = 0
+        else:
+            # No orders found for this month, start from 0
+            sequence = 0
+
+        # Return next sequence (increment by 1)
+        return sequence + 1
+
+    def _format_order_number(self, sequence: int) -> str:
+        """
+        Format order number with sequence.
+
+        Args:
+            sequence: Sequence number
+
+        Returns:
+            Formatted order number: ORD-YYMM-{Sequence}
+        """
+        # Get current year and month in YYMM format (e.g., 2512 for December 2025)
+        now = datetime.now(timezone.utc)
+        yymm = now.strftime("%y%m")
+        sequence_str = f"{sequence:04d}"
+        return f"ORD-{yymm}-{sequence_str}"
+
+    async def _generate_order_number(self) -> str:
+        """
+        Generate a unique order number with format ORD-YYMM-{Sequence}.
+
+        The sequence resets to 0001 when the month changes.
+        Example: ORD-2512-0001, ORD-2512-0002, ORD-2512-0003
+
+        Returns:
+            Unique order number in format: ORD-YYMM-{Sequence}
+        """
+        sequence = await self._get_next_sequence()
+        return self._format_order_number(sequence)
 
     async def create_order_from_webhook(self, request: OrderWebhookRequest) -> List[str]:
         """
@@ -97,6 +155,10 @@ class OrderWebhookService:
         try:
             created_order_numbers = []
 
+            # Get starting sequence for bulk operations
+            # This ensures sequential numbering when creating multiple orders
+            current_sequence = await self._get_next_sequence()
+
             # Process each order in the request
             for order_request in request.orders:
                 # Lookup division by name
@@ -112,8 +174,9 @@ class OrderWebhookService:
                         http_status_code=status.HTTP_404_NOT_FOUND
                     )
 
-                # Generate unique order number
-                order_number = self._generate_order_number()
+                # Generate unique order number using current sequence
+                order_number = self._format_order_number(current_sequence)
+                current_sequence += 1
 
                 # Calculate total amount from items
                 total_amount = sum(
