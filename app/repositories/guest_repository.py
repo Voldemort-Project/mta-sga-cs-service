@@ -148,7 +148,13 @@ class GuestRepository:
         role: MessageRole,
         text: str
     ) -> Message:
-        """Create a new message in a session"""
+        """Create a new message in a session and update session.updated_at"""
+        # Get session to update its updated_at timestamp
+        session = await self.get_session_by_id(session_id)
+        if session:
+            # Update session.updated_at to current time
+            session.updated_at = datetime.now(timezone.utc)
+
         message = Message(
             session_id=session_id,
             role=role,
